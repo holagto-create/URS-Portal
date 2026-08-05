@@ -1,6 +1,7 @@
 ﻿{
-  "buildCommand": "cd urs-portal && npm install && npm run build",
-  "outputDirectory": "urs-portal/dist",
   "framework": "vite",
-  "installCommand": "cd urs-portal && npm install"
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }
