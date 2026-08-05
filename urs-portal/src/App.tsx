@@ -8,7 +8,7 @@ import {
 // ============================================================================
 // CONFIG
 // ============================================================================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhjwO_WVLoRGIi101rvLX1yhOnRJslYJoB8XcS-pGCOXhjfk8C1tiq1oX_KALd5MFaGQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwMu0lmzDEPrYREOdeGX9uSuQ__c0lnZ-mBkTGRbFDhOcfwgEO6bqNW6IdZV6u-puzNWg/exec';
 
 // ============================================================================
 // TYPES
