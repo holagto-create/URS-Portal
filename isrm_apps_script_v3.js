@@ -1,4 +1,4 @@
-// =============================================================================
+﻿// =============================================================================
 // ISRM Research Statistical Services — Digital Operations Suite
 // Google Apps Script | Saint Louis University — RISE Center
 // Updated for: FM-RIS-002 / FM-RIS-003 / FM-RIS-059 / FM-RIS-060
@@ -72,13 +72,6 @@ const CONFIG = {
   ISM_OFFICER_EMAIL:          'isrm_rise@slu.edu.ph',
   RISE_CENTER_DIRECTOR_EMAIL: 'holagto@slu.edu.ph',
 
-  // ── Sheet Names (must match exactly) ────────────────────────────────────
-  SHEET: {
-    CLIENTS:  'Clients',
-    URS:      'URS_Registry',
-    SUMMARY:  'Financial_Summary',
-  },
-
   // ── Fee Schedule (RSS Manual §II — current semester rates) ───────────────
   FEES: {
     CONSULT: {
@@ -99,22 +92,6 @@ const CONFIG = {
   SEM: 'First Semester',
   AY:  '2025-2026',
 
-  // ── Turnaround Time (TAT) in Working Days ──────────────────────────────────
-  TAT: {
-    FULL_ANALYSIS:     14,  // Full Statistical Assistance (14 working days)
-    VALIDITY_RELIABILITY: 4,  // Reliability/Validity of Research Instrument
-    CONSULTATION:      0,   // Consultation (no fixed TAT)
-    MENTORING:         0,   // Mentoring Services (no fixed TAT)
-    OTHERS:            10,  // Others
-  },
-
-  // ── Deadline Warning Thresholds (days before due) ───────────────────────────
-  DEADLINE_WARNING: {
-    CRITICAL: 2,   // Red alert: due within 2 days
-    WARNING:  5,   // Orange alert: due within 5 days
-    NOTICE:   10,  // Yellow notice: due within 10 days
-  },
-
   // ── Column Indices in Clients Sheet (1-based, sync with setupDashboard) ──
   COL: {
     RECORD_ID:       1,  DATE:            2,  CLIENT_NAME:     3,
@@ -126,7 +103,37 @@ const CONFIG = {
     URS_SHARE:      19,  UNIT_SHARE:    20,  SEMESTER:       21,
     AY:             22,  STATUS:        23,  REMARKS:        24,
     RESEARCH_OBJECTIVES: 25, RESEARCH_QUESTIONS: 26, DRIVE_FOLDER: 27,
-    ASSIGNMENT_DATE: 28, EXPECTED_COMPLETION: 29,
+    // v10 additions — Turnaround deadline tracking
+    IN_PROGRESS_DATE: 28, DEADLINE_DATE: 29,
+  },
+
+  // ── URS Registry Column Indices (1-based) ───────────────────────────────
+  URS_COL: {
+    URS_ID:       1,  FULL_NAME:    2,  DEPARTMENT:   3,
+    HIGHEST_DEG:  4,  SPEC:         5,  EMAIL:        6,
+    CONTACT:      7,  AVAIL_DAYS:   8,  STATUS:       9,
+    AY_APPOINTED: 10, NOTES:        11,
+    // v10 additions
+    AVAILABILITY:        12,   // 'Available' | 'Unavailable'
+    AVAILABILITY_REASON: 13,   // Free-text reason set by URS
+    PASSWORD:            14,   // Set by Officer; URS can change via portal
+  },
+
+  // ── Sheet Names ──────────────────────────────────────────────────────────
+  SHEET: {
+    CLIENTS:       'Clients',
+    URS:           'URS_Registry',
+    SUMMARY:       'Financial_Summary',
+    ANNOUNCEMENTS: 'Announcements',
+    HOLIDAYS:      'Holidays',          // v10: Officer-managed holiday list
+  },
+
+  // ── Turnaround Times (working days, Sundays always excluded) ─────────────
+  // Only service types that have a defined TAT are listed here.
+  // Consultation and Mentoring Services have no TAT.
+  TURNAROUND_DAYS: {
+    'Full Statistical Assistance':               14,
+    'Reliability/Validity of Research Instrument': 4,
   },
 };
 
@@ -143,18 +150,19 @@ function onOpen() {
     )
     .addSeparator()
     .addItem('📧  Send Satisfaction Survey Link (FM-RIS-003)', 'sendSatisfactionSurveyEmail')
-    .addItem('📅  Send Appointment Booking Link',            'sendAppointmentLink')
+    .addItem('📅  Send Appointment Booking Link',              'sendAppointmentLink')
     .addItem('💰  Financial Summary (Quick View)',              'showFinancialSummary')
     .addSeparator()
     .addSubMenu(
-      SpreadsheetApp.getUi().createMenu('⏰  Deadline Reminders')
-        .addItem('Enable Daily Reminders (8 AM)',              'setupDeadlineReminderTrigger')
-        .addItem('Disable Daily Reminders',                   'removeDeadlineReminderTrigger')
-        .addItem('Test Reminders Now',                        'testDeadlineReminders')
+      SpreadsheetApp.getUi().createMenu('⏱  Turnaround & Availability')
+        .addItem('🔔  Send Deadline Reminders Now',            'checkAndSendDeadlineReminders')
+        .addItem('📋  Initialize Holidays Sheet',              'setupHolidaysSheet')
+        .addItem('🔄  Sync All URS Availability',              'syncAllURSAvailability')
     )
     .addSeparator()
-    .addItem('⚙️  Initialize / Reset Dashboard',              'setupDashboard')
-    .addItem('🔗  Setup Form Submit Trigger (FM-RIS-002)',     'setupFormTrigger')
+    .addItem('⚙️  Initialize / Reset Dashboard',               'setupDashboard')
+    .addItem('🔗  Setup Form Submit Trigger (FM-RIS-002)',      'setupFormTrigger')
+    .addItem('🔑  Setup URS Password Column',                  'setupURSPasswordColumn')
     .addItem('📊  URS Dashboard View',                         'showURSDashboard')
     .addToUi();
 }
@@ -193,16 +201,10 @@ function onEdit(e) {
   if (col === C.PAY_STATUS) {
     try {
       const newValue = e.value ? e.value.toString().trim() : '';
-      
       Logger.log(`onEdit PAY_STATUS: new="${newValue}", row=${row}`);
-      
-      // Check if changed to "Paid" (case insensitive)
       if (newValue.toLowerCase() === 'paid') {
         Logger.log(`Payment Status set to Paid for row ${row}. Sending appointment link...`);
-        
-        // Add a small delay to ensure the cell is fully updated
         Utilities.sleep(1000);
-        
         sendAppointmentLinkAuto(row);
       }
     } catch (err) {
@@ -210,24 +212,60 @@ function onEdit(e) {
     }
   }
 
-  // ── Auto-send URS notification when Assigned URS is set ─────────────────────
+  // ── Auto-send URS notification when Assigned URS is set ──────────────────
   if (col === C.ASSIGNED_URS && e.value) {
     try {
       const ursName = e.value.toString().trim();
-
       if (ursName && ursName !== '') {
         Logger.log(`onEdit ASSIGNED_URS: ursName="${ursName}", row=${row}`);
-
-        // Add a small delay to ensure the cell is fully updated
         Utilities.sleep(1000);
-
-        // Auto-stamp Assignment Date and Expected Completion
-        onAssignURS(row, ursName);
-
         sendURSNotification(row, ursName);
       }
     } catch (err) {
       Logger.log(`Error in ASSIGNED_URS onEdit: ${err.message}`);
+    }
+  }
+
+  // ── v10: Status changes — stamp In Progress date, calculate deadline, sync availability ──
+  if (col === C.STATUS) {
+    try {
+      const newStatus = e.value ? e.value.toString().trim() : '';
+      const serviceType = sheet.getRange(row, C.SERVICE).getValue() || '';
+      const assignedURS = sheet.getRange(row, C.ASSIGNED_URS).getValue() || '';
+
+      if (newStatus === 'In Progress') {
+        // Stamp the In Progress date (used as the TAT clock start)
+        const now = new Date();
+        const nowStr = Utilities.formatDate(now, 'Asia/Manila', 'yyyy-MM-dd');
+        sheet.getRange(row, C.IN_PROGRESS_DATE).setValue(nowStr);
+
+        // Calculate and store the deadline if this service has a TAT
+        const tatDays = CONFIG.TURNAROUND_DAYS[serviceType] || 0;
+        if (tatDays > 0) {
+          const deadline = calculateDeadline(now, tatDays);
+          const deadlineStr = Utilities.formatDate(deadline, 'Asia/Manila', 'yyyy-MM-dd');
+          sheet.getRange(row, C.DEADLINE_DATE).setValue(deadlineStr);
+          Logger.log(`TAT deadline set: ${deadlineStr} for ${serviceType} (${tatDays} working days)`);
+        }
+
+        // Mark URS as Unavailable (they now have an active project)
+        if (assignedURS) {
+          setURSAvailabilityInternal(assignedURS, 'Unavailable', 'Working on a project');
+        }
+
+      } else if (newStatus === 'Completed' || newStatus === 'Cancelled') {
+        // Clear deadline columns
+        sheet.getRange(row, C.IN_PROGRESS_DATE).setValue('');
+        sheet.getRange(row, C.DEADLINE_DATE).setValue('');
+
+        // Re-check whether the URS still has other active projects
+        if (assignedURS) {
+          Utilities.sleep(500);
+          syncURSAvailabilityForOne(assignedURS);
+        }
+      }
+    } catch (err) {
+      Logger.log(`Error in STATUS onEdit: ${err.message}`);
     }
   }
 }
@@ -1307,7 +1345,8 @@ function setupDashboard() {
         'Payment Status',  'Assigned URS',     'URS Share 60% (₱)','Unit Share 40% (₱)',
         'Semester',        'AY',               'Status',           'Remarks',
         'Research Objectives', 'Research Questions', 'Drive Folder URL',
-        'Assignment Date', 'Expected Completion',
+        // v10 additions
+        'In Progress Date', 'Deadline Date',
       ],
     },
     {
@@ -1316,6 +1355,8 @@ function setupDashboard() {
         'URS ID',        'Full Name',          'Department',         'Highest Degree',
         'Specialization','Email',              'Contact No.',        'Available Days/Hours',
         'Status',        'AY Appointed',       'Notes',
+        // v10 additions
+        'Availability',  'Availability Reason', 'Password',
       ],
     },
     {
@@ -1369,6 +1410,12 @@ function setupDashboard() {
     .setDataValidation(mkValidation(['Pending','Paid']));
   cs.getRange(2, C.STATUS,      1000, 1)
     .setDataValidation(mkValidation(['New','In Progress','Completed','Cancelled']));
+
+  // ── v10: URS Registry validation ─────────────────────────────────────────
+  const ursSheet = ss.getSheetByName(CONFIG.SHEET.URS);
+  const UC = CONFIG.URS_COL;
+  ursSheet.getRange(2, UC.AVAILABILITY, 1000, 1)
+    .setDataValidation(mkValidation(['Available','Unavailable']));
 
   // ── Conditional Formatting ────────────────────────────────────────────────
   const dataRange = cs.getRange('A2:AA1000');
@@ -1442,6 +1489,11 @@ function setupFormTrigger() {
     .filter(t => t.getHandlerFunction() === 'onEdit')
     .forEach(t => ScriptApp.deleteTrigger(t));
 
+  // Remove any existing deadline-check triggers
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'checkAndSendDeadlineReminders')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
   // Create onFormSubmit trigger
   ScriptApp.newTrigger('onFormSubmit')
     .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
@@ -1452,6 +1504,14 @@ function setupFormTrigger() {
   ScriptApp.newTrigger('onEdit')
     .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
     .onEdit()
+    .create();
+
+  // Create daily time-driven trigger for deadline reminder emails (runs at 8 AM Manila time)
+  // Apps Script runs in UTC — Asia/Manila is UTC+8, so 8 AM Manila = 0:00 UTC
+  ScriptApp.newTrigger('checkAndSendDeadlineReminders')
+    .timeBased()
+    .everyDays(1)
+    .atHour(0)   // midnight UTC = 8 AM Manila
     .create();
 
   SpreadsheetApp.getUi().alert(
@@ -1711,6 +1771,7 @@ function showURSDashboard() {
  */
 function doGet(e) {
   const action = e.parameter.action;
+  
   try {
     // JSON API for external React app
     if (action === 'getDashboardData') {
@@ -1718,6 +1779,7 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(data))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    
     // URS API endpoints
     if (action === 'getURSClients') {
       const ursName = e.parameter.ursName;
@@ -1728,6 +1790,7 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(data))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    
     // Validate URS credentials
     if (action === 'validateURSCredentials') {
       const ursName = e.parameter.name;
@@ -1740,140 +1803,61 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
-    // Monitoring/Notifications API for Officer Dashboard
-    if (action === 'getMonitoringData') {
-      const data = getMonitoringData();
-      return ContentService.createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    // Monthly/Semester Statistics for charts
-    if (action === 'getMonthlyStatistics') {
-      const data = getMonthlyStatistics();
-      return ContentService.createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    // URS with Deadline info (for URS Portal)
-    if (action === 'getURSClientsWithDeadline') {
-      const ursName = e.parameter.ursName;
-      if (!ursName) {
-        throw new Error('URS name is required');
-      }
-      const data = getURSClientsWithDeadline(ursName);
-      return ContentService.createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Get available clients (for URS to claim)
-    if (action === 'getAvailableClients') {
-      const data = getAvailableClients();
-      return ContentService.createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // URS claims a client
-    if (action === 'claimClient') {
-      const recordId = e.parameter.recordId;
-      const ursName = e.parameter.ursName;
-      if (!recordId || !ursName) {
-        throw new Error('Record ID and URS name are required');
-      }
-      const data = claimClient(recordId, ursName);
-      return ContentService.createTextOutput(JSON.stringify(data))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    // Announcements, Live Updates, Resources (from the other file)
+    
+    // Get announcements
     if (action === 'getAnnouncements') {
-      return getAnnouncementsAPI();
+      const data = getAnnouncements();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
     }
+    
+    // Get live updates
     if (action === 'getLiveUpdates') {
-      return getLiveUpdatesAPI();
+      const data = getLiveUpdates();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
     }
+    
+    // Get resources
     if (action === 'getResources') {
-      return getResourcesAPI();
+      const data = getResources();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
     }
+
+    // v10: Get URS availability list
+    if (action === 'getURSAvailability') {
+      const data = getURSAvailabilityData();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // v10: Get active project deadlines
+    if (action === 'getURSDeadlines') {
+      const data = getURSDeadlinesData();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // URS Portal: Get all clients (for All Clients view)
+    if (action === 'getAllClients') {
+      const data = getAllClientsData();
+      return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // Default: Return API info
     return ContentService.createTextOutput(JSON.stringify({
       status: 'ok',
-      message: 'ISRM API is running.',
-      availableActions: [
-        'getDashboardData',
-        'getURSClients',
-        'getURSClientsWithDeadline',
-        'validateURSCredentials',
-        'getMonitoringData',
-        'getMonthlyStatistics',
-        'getAnnouncements',
-        'getLiveUpdates',
-        'getResources'
-      ]
+      message: 'ISRM API is running. Use ?action=getDashboardData for data.',
+      availableActions: ['getDashboardData', 'getURSClients', 'getAnnouncements', 'getLiveUpdates', 'getResources']
     })).setMimeType(ContentService.MimeType.JSON);
+    
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',
       message: error.message || 'Unknown error'
     })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-// ============ Announcements, Live Updates, Resources ============
-function getAnnouncementsAPI() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Announcements');
-    if (!sheet) return ContentService.createTextOutput(JSON.stringify({success: true, announcements: []})).setMimeType(ContentService.MimeType.JSON);
-    const data = sheet.getDataRange().getValues();
-    const announcements = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) {
-        let dateStr = '';
-        if (data[i][2]) {
-          const d = new Date(data[i][2]);
-          dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
-        }
-        announcements.push({id: i, type: data[i][0], badge: data[i][1], date: dateStr, title: data[i][3], body: data[i][4]});
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({success: true, announcements: announcements})).setMimeType(ContentService.MimeType.JSON);
-  } catch (e) {
-    return ContentService.createTextOutput(JSON.stringify({success: false, message: e.message})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-function getLiveUpdatesAPI() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('LiveUpdates');
-    if (!sheet) return ContentService.createTextOutput(JSON.stringify({success: true, updates: []})).setMimeType(ContentService.MimeType.JSON);
-    const data = sheet.getDataRange().getValues();
-    const updates = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) {
-        let dateStr = '';
-        if (data[i][3]) {
-          const d = new Date(data[i][3]);
-          dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
-        }
-        updates.push({id: i, title: data[i][0], description: data[i][1], link: data[i][2], date: dateStr, category: data[i][4]});
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({success: true, updates: updates})).setMimeType(ContentService.MimeType.JSON);
-  } catch (e) {
-    return ContentService.createTextOutput(JSON.stringify({success: false, message: e.message})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-function getResourcesAPI() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Resources');
-    if (!sheet) return ContentService.createTextOutput(JSON.stringify({success: true, resources: []})).setMimeType(ContentService.MimeType.JSON);
-    const data = sheet.getDataRange().getValues();
-    const resources = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) {
-        resources.push({id: i, category: data[i][0], title: data[i][1], description: data[i][2], link: data[i][3], tags: data[i][4] ? data[i][4].split(',').map(t => t.trim()) : []});
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({success: true, resources: resources})).setMimeType(ContentService.MimeType.JSON);
-  } catch (e) {
-    return ContentService.createTextOutput(JSON.stringify({success: false, message: e.message})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -1882,8 +1866,22 @@ function getResourcesAPI() {
  * Supports: action=updateClientBatch, action=generateReport
  */
 function doPost(e) {
-  const postData = e.postData ? JSON.parse(e.postData.contents) : {};
+  let postData = {};
+  try {
+    if (e.postData && e.postData.contents) {
+      postData = JSON.parse(e.postData.contents);
+    } else if (e.parameter && e.parameter.action) {
+      postData = e.parameter;
+    }
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: 'Failed to parse request: ' + err.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
   const action = postData.action;
+  Logger.log('doPost received: action=' + action + ', postData=' + JSON.stringify(postData));
 
   try {
     if (action === 'updateClientBatch') {
@@ -1911,9 +1909,59 @@ function doPost(e) {
 
     if (action === 'updateClientStatus') {
       const { recordId, status, notes } = postData;
+      Logger.log('updateClientStatus called: recordId=' + recordId + ', status=' + status + ', notes=' + notes);
       return ContentService.createTextOutput(JSON.stringify(updateClientStatusByURS(recordId, status, notes)))
         .setMimeType(ContentService.MimeType.JSON);
     }
+
+    // v10: URS sets their own availability from the URS Portal
+    if (action === 'setURSAvailability') {
+      const { ursName, availability, reason } = postData;
+      Logger.log('setURSAvailability called: ursName=' + ursName + ', availability=' + availability);
+      return ContentService.createTextOutput(JSON.stringify(setURSAvailabilityInternal(ursName, availability, reason || '')))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── Content Management ───────────────────────────────────────────────────
+    if (action === 'addContent') {
+      const { sheet, row } = postData;
+      return ContentService.createTextOutput(JSON.stringify(addContentRow(sheet, row)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'updateContent') {
+      const { sheet, rowNum, row } = postData;
+      return ContentService.createTextOutput(JSON.stringify(updateContentRow(sheet, parseInt(rowNum), row)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'deleteContent') {
+      const { sheet, rowNum } = postData;
+      return ContentService.createTextOutput(JSON.stringify(deleteContentRow(sheet, parseInt(rowNum))))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── URS Password Management ──────────────────────────────────────────────
+    if (action === 'changeURSPassword') {
+      const { ursName, email, currentPassword, newPassword } = postData;
+      return ContentService.createTextOutput(JSON.stringify(changeURSPasswordFn(ursName, email, currentPassword, newPassword)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === 'resetURSPassword') {
+      const { ursName, newPassword, officerPassword } = postData;
+      return ContentService.createTextOutput(JSON.stringify(resetURSPasswordFn(ursName, newPassword, officerPassword)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // URS Portal: Express interest in an unassigned client
+    if (action === 'expressInterest') {
+      const { recordId, ursName } = postData;
+      return ContentService.createTextOutput(JSON.stringify(expressInterestFn(recordId, ursName)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    Logger.log('Unknown action received: ' + action + '. Full postData: ' + JSON.stringify(postData));
 
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
@@ -2076,14 +2124,18 @@ function getDashboardData() {
     return obj;
   }).filter(c => c['Record ID']); // Filter empty rows
 
-  // Get URS data
+  // Get URS data — explicitly strip the Password field before returning
   const ursData = ursSheet.getDataRange().getValues();
   const ursHeaders = ursData[0];
   const urs = ursData.slice(1).map(row => {
     const obj = {};
     ursHeaders.forEach((h, i) => { obj[h] = row[i]; });
     return obj;
-  }).filter(u => u['URS ID']);
+  }).filter(u => u['URS ID'])
+    .map(u => {
+      delete u['Password'];   // never expose passwords to the browser
+      return u;
+    });
 
   // Calculate financial summary
   const paidClients = clients.filter(c => c['Payment Status'] === 'Paid');
@@ -2139,7 +2191,7 @@ function getClients(filterBy = 'all') {
 }
 
 /**
- * getURS — Returns all URS records
+ * getURS — Returns all URS records (Password field excluded)
  */
 function getURS() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2149,7 +2201,9 @@ function getURS() {
 
   return data.slice(1).map((row, idx) => {
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i]; });
+    headers.forEach((h, i) => {
+      if (h !== 'Password') obj[h] = row[i]; // never expose password
+    });
     return obj;
   }).filter(u => u['URS ID']);
 }
@@ -2296,7 +2350,7 @@ function validateURSCredentials(ursName, email, password) {
   for (let i = 1; i < ursData.length; i++) {
     const fullName = ursData[i][1] ? ursData[i][1].toString().trim() : '';
     const ursEmail = ursData[i][5] ? ursData[i][5].toString().trim() : '';
-    const ursPassword = ursData[i][11] ? ursData[i][11].toString().trim() : ''; // Column L - Password
+    const ursPassword = ursData[i][URS_PASSWORD_COL - 1] ? ursData[i][URS_PASSWORD_COL - 1].toString().trim() : ''; // Column N - Password
     const status = ursData[i][8] ? ursData[i][8].toString().trim() : '';
 
     Logger.log(`Checking: name="${fullName}" (${fullName.toLowerCase()}) vs "${inputName}", email="${ursEmail}" (${ursEmail.toLowerCase()}) vs "${inputEmail}", status="${status}", hasPassword=${!!ursPassword}`);
@@ -2438,7 +2492,7 @@ function updateClientStatusByURS(recordId, status, notes) {
         };
       }
     }
-
+    
     return {
       success: false,
       message: 'Client not found: ' + recordId
@@ -2451,893 +2505,1177 @@ function updateClientStatusByURS(recordId, status, notes) {
   }
 }
 
-// =============================================================================
-// TAT (TURNAROUND TIME) HELPER FUNCTIONS
-// =============================================================================
+/**
+ * getAnnouncements — Returns announcements from Announcements sheet
+ * Includes rowNum so the Content Manager can update/delete specific rows.
+ */
+function getAnnouncements() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(CONFIG.SHEET.ANNOUNCEMENTS);
+    
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet(CONFIG.SHEET.ANNOUNCEMENTS);
+      sheet.getRange(1, 1, 1, 7)
+        .setValues([['Type', 'Badge', 'BadgeColor', 'Date', 'Title', 'Body', 'Link']])
+        .setFontWeight('bold')
+        .setBackground('#1A3666')
+        .setFontColor('#FFFFFF');
+      return { success: true, announcements: [] };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: true, announcements: [] };
+    }
+    
+    const announcements = [];
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) {
+        announcements.push({
+          id:         i,
+          rowNum:     i + 1,   // 1-indexed sheet row
+          type:       data[i][0] || '',
+          badge:      data[i][1] || '',
+          badgeColor: data[i][2] || 'navy',
+          date:       data[i][3] || '',
+          title:      data[i][4] || '',
+          body:       data[i][5] || '',
+          link:       data[i][6] || '',
+        });
+      }
+    }
+    
+    return { success: true, announcements: announcements };
+  } catch (e) {
+    return { success: false, message: e.message, announcements: [] };
+  }
+}
 
 /**
- * addWorkingDays — Adds working days to a date, skipping weekends
- * @param {Date} startDate - Starting date
- * @param {number} workingDays - Number of working days to add
- * @returns {Date} - Resulting date
+ * getLiveUpdates — Returns live updates from LiveUpdates sheet
+ * Includes rowNum so the Content Manager can update/delete specific rows.
  */
-function addWorkingDays(startDate, workingDays) {
-  const date = new Date(startDate);
+function getLiveUpdates() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('LiveUpdates');
+    
+    if (!sheet) {
+      return { success: true, updates: [] };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: true, updates: [] };
+    }
+    
+    const updates = [];
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) {
+        updates.push({
+          id:          i,
+          rowNum:      i + 1,   // 1-indexed sheet row
+          title:       data[i][0] || '',
+          description: data[i][1] || '',
+          link:        data[i][2] || '',
+          date:        data[i][3] || '',
+          category:    data[i][4] || '',
+        });
+      }
+    }
+    
+    return { success: true, updates: updates };
+  } catch (e) {
+    return { success: false, message: e.message, updates: [] };
+  }
+}
+
+/**
+ * getResources — Returns resources from Resources sheet
+ * Includes rowNum so the Content Manager can update/delete specific rows.
+ */
+function getResources() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Resources');
+    
+    if (!sheet) {
+      return { success: true, resources: [] };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return { success: true, resources: [] };
+    }
+    
+    const resources = [];
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) {
+        resources.push({
+          id:          i,
+          rowNum:      i + 1,   // 1-indexed sheet row (row 1 is header)
+          category:    data[i][0] || '',
+          title:       data[i][1] || '',
+          description: data[i][2] || '',
+          link:        data[i][3] || '',
+          tags:        data[i][4] ? data[i][4].split(',').map(t => t.trim()) : [],
+        });
+      }
+    }
+    
+    return { success: true, resources: resources };
+  } catch (e) {
+    return { success: false, message: e.message, resources: [] };
+  }
+}
+
+// =============================================================================
+// v10 — URS AVAILABILITY & TURNAROUND TIME SYSTEM
+// =============================================================================
+
+// =============================================================================
+// HOLIDAYS SHEET SETUP
+// Creates the Holidays sheet where the Officer can add custom holiday dates.
+// These are excluded from turnaround day calculations.
+// =============================================================================
+function setupHolidaysSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SHEET.HOLIDAYS);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.SHEET.HOLIDAYS);
+  } else {
+    // Preserve existing data — only set up header if sheet is empty
+    if (sheet.getLastRow() > 0) {
+      SpreadsheetApp.getUi().alert(
+        '⚠️  Holidays sheet already exists and has data.\n' +
+        'No changes were made. Edit the sheet directly to add or remove holidays.'
+      );
+      return;
+    }
+  }
+
+  // Set up header
+  sheet.getRange(1, 1, 1, 3)
+    .setValues([['Date (yyyy-MM-dd)', 'Holiday Name', 'Type']])
+    .setFontWeight('bold')
+    .setBackground('#1A3666')
+    .setFontColor('#FFFFFF');
+
+  sheet.setColumnWidth(1, 160);
+  sheet.setColumnWidth(2, 250);
+  sheet.setColumnWidth(3, 160);
+  sheet.setFrozenRows(1);
+
+  // Pre-populate with 2025–2026 Philippine regular holidays
+  const defaultHolidays = [
+    // 2025 regular holidays
+    ['2025-01-01', "New Year's Day",              'Regular'],
+    ['2025-04-09', 'Araw ng Kagitingan',          'Regular'],
+    ['2025-04-17', 'Maundy Thursday',             'Regular'],
+    ['2025-04-18', 'Good Friday',                 'Regular'],
+    ['2025-05-01', 'Labor Day',                   'Regular'],
+    ['2025-06-12', 'Independence Day',            'Regular'],
+    ['2025-08-25', 'National Heroes Day',         'Regular'],
+    ['2025-11-01', "All Saints' Day",             'Special'],
+    ['2025-11-30', 'Bonifacio Day',               'Regular'],
+    ['2025-12-08', 'Feast of the Immaculate Conception', 'Special'],
+    ['2025-12-25', 'Christmas Day',               'Regular'],
+    ['2025-12-30', 'Rizal Day',                   'Regular'],
+    // 2026 regular holidays
+    ['2026-01-01', "New Year's Day",              'Regular'],
+    ['2026-04-02', 'Maundy Thursday',             'Regular'],
+    ['2026-04-03', 'Good Friday',                 'Regular'],
+    ['2026-04-09', 'Araw ng Kagitingan',          'Regular'],
+    ['2026-05-01', 'Labor Day',                   'Regular'],
+    ['2026-06-12', 'Independence Day',            'Regular'],
+    ['2026-08-31', 'National Heroes Day',         'Regular'],
+    ['2026-11-30', 'Bonifacio Day',               'Regular'],
+    ['2026-12-25', 'Christmas Day',               'Regular'],
+    ['2026-12-30', 'Rizal Day',                   'Regular'],
+  ];
+
+  sheet.getRange(2, 1, defaultHolidays.length, 3).setValues(defaultHolidays);
+
+  SpreadsheetApp.getUi().alert(
+    '✅  Holidays Sheet Created!\n\n' +
+    `Pre-populated with ${defaultHolidays.length} Philippine public holidays (2025–2026).\n\n` +
+    'You can:\n' +
+    '  • Add rows for additional school-specific or local holidays\n' +
+    '  • Delete rows for holidays that do not apply\n' +
+    '  • Use format yyyy-MM-dd in the Date column\n\n' +
+    'These dates are excluded from turnaround time calculations.'
+  );
+}
+
+// =============================================================================
+// HELPER — Load holiday dates from the Holidays sheet into a Set of strings
+// Returns a Set<string> of 'yyyy-MM-dd' holiday strings
+// =============================================================================
+function loadHolidaySet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET.HOLIDAYS);
+  const holidays = new Set();
+
+  if (!sheet || sheet.getLastRow() < 2) return holidays;
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  data.forEach(row => {
+    const raw = row[0];
+    if (!raw) return;
+    try {
+      let dateStr;
+      if (typeof raw === 'string') {
+        dateStr = raw.trim();
+      } else {
+        // Google Sheets may store as Date object
+        dateStr = Utilities.formatDate(new Date(raw), 'Asia/Manila', 'yyyy-MM-dd');
+      }
+      if (dateStr) holidays.add(dateStr);
+    } catch (e) {
+      Logger.log('Holiday parse error: ' + e.message);
+    }
+  });
+
+  Logger.log('Loaded ' + holidays.size + ' holidays');
+  return holidays;
+}
+
+// =============================================================================
+// HELPER — calculateDeadline(startDate, workingDays)
+// Adds `workingDays` working days to `startDate`, skipping Sundays and
+// Officer-configured holidays (loaded from the Holidays sheet).
+// Returns a Date object set to midnight Asia/Manila on the deadline day.
+// =============================================================================
+function calculateDeadline(startDate, workingDays) {
+  const holidays = loadHolidaySet();
+  let current = new Date(startDate.getTime());
   let daysAdded = 0;
 
   while (daysAdded < workingDays) {
-    date.setDate(date.getDate() + 1);
-    const dayOfWeek = date.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Saturday or Sunday
-      daysAdded++;
-    }
-  }
-
-  return date;
-}
-
-/**
- * getWorkingDaysRemaining — Calculates working days until due date
- * @param {Date} dueDate - Target date
- * @returns {number} - Working days remaining (negative if overdue)
- */
-function getWorkingDaysRemaining(dueDate) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-
-  let workingDays = 0;
-  const current = new Date(today);
-
-  while (current < due) {
+    // Advance one calendar day
     current.setDate(current.getDate() + 1);
-    const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      workingDays++;
-    }
+
+    const dayOfWeek = current.getDay(); // 0=Sun, 6=Sat
+    const dateStr = Utilities.formatDate(current, 'Asia/Manila', 'yyyy-MM-dd');
+
+    // Skip Sundays and holidays
+    if (dayOfWeek === 0) continue;   // Sunday
+    if (holidays.has(dateStr)) continue; // Holiday
+
+    daysAdded++;
   }
 
-  // If due date has passed, calculate negative
-  if (today > due) {
-    workingDays = 0;
-    const temp = new Date(due);
-    while (temp < today) {
-      temp.setDate(temp.getDate() + 1);
-      const dayOfWeek = temp.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        workingDays--;
+  return current;
+}
+
+// =============================================================================
+// HELPER — countRemainingWorkingDays(deadlineDate)
+// Counts working days (excl. Sundays, holidays) from today to deadlineDate.
+// Returns a negative number if the deadline has passed.
+// =============================================================================
+function countRemainingWorkingDays(deadlineDate) {
+  const holidays = loadHolidaySet();
+  const today = new Date();
+  const todayStr = Utilities.formatDate(today, 'Asia/Manila', 'yyyy-MM-dd');
+  const deadlineStr = Utilities.formatDate(deadlineDate, 'Asia/Manila', 'yyyy-MM-dd');
+
+  if (todayStr === deadlineStr) return 0;
+
+  const isAfterDeadline = today > deadlineDate;
+  let count = 0;
+  let cursor = new Date(isAfterDeadline ? deadlineDate.getTime() : today.getTime());
+  const end = new Date(isAfterDeadline ? today.getTime() : deadlineDate.getTime());
+
+  while (cursor < end) {
+    cursor.setDate(cursor.getDate() + 1);
+    const dayOfWeek = cursor.getDay();
+    const dateStr = Utilities.formatDate(cursor, 'Asia/Manila', 'yyyy-MM-dd');
+    if (dayOfWeek === 0) continue;        // Sunday
+    if (holidays.has(dateStr)) continue;  // Holiday
+    count++;
+  }
+
+  return isAfterDeadline ? -count : count;
+}
+
+// =============================================================================
+// getURSAvailabilityData — Returns all URS records with availability fields
+// Called by doGet ?action=getURSAvailability
+// =============================================================================
+function getURSAvailabilityData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+    if (!sheet) return { success: false, message: 'URS_Registry sheet not found', urs: [] };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, urs: [] };
+
+    const UC = CONFIG.URS_COL;
+    const ursList = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[UC.URS_ID - 1]) continue; // skip empty rows
+      ursList.push({
+        ursId:              row[UC.URS_ID - 1]             || '',
+        name:               row[UC.FULL_NAME - 1]           || '',
+        department:         row[UC.DEPARTMENT - 1]          || '',
+        email:              row[UC.EMAIL - 1]               || '',
+        status:             row[UC.STATUS - 1]              || '',
+        availability:       row[UC.AVAILABILITY - 1]        || 'Available',
+        availabilityReason: row[UC.AVAILABILITY_REASON - 1] || '',
+      });
+    }
+
+    return { success: true, urs: ursList };
+  } catch (e) {
+    return { success: false, message: e.message, urs: [] };
+  }
+}
+
+// =============================================================================
+// getURSDeadlinesData — Returns all In Progress projects that have a deadline
+// Called by doGet ?action=getURSDeadlines
+// =============================================================================
+function getURSDeadlinesData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+    if (!sheet) return { success: false, message: 'Clients sheet not found', deadlines: [] };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, deadlines: [] };
+
+    const C = CONFIG.COL;
+    const deadlines = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[C.RECORD_ID - 1]) continue;
+
+      const status      = (row[C.STATUS - 1] || '').toString().trim();
+      const serviceType = (row[C.SERVICE - 1] || '').toString().trim();
+      const deadlineRaw = row[C.DEADLINE_DATE - 1];
+      const inProgRaw   = row[C.IN_PROGRESS_DATE - 1];
+
+      // Only include In Progress records that have a deadline date set
+      if (status !== 'In Progress' || !deadlineRaw) continue;
+
+      let deadlineDate, inProgressDate;
+      try {
+        deadlineDate   = new Date(deadlineRaw);
+        inProgressDate = inProgRaw ? new Date(inProgRaw) : null;
+      } catch (e) {
+        Logger.log('Date parse error for row ' + (i + 1) + ': ' + e.message);
+        continue;
+      }
+
+      if (isNaN(deadlineDate.getTime())) continue;
+
+      const remaining = countRemainingWorkingDays(deadlineDate);
+
+      deadlines.push({
+        recordId:            row[C.RECORD_ID - 1]   || '',
+        clientName:          row[C.CLIENT_NAME - 1] || '',
+        researchTitle:       row[C.TITLE - 1]       || '',
+        serviceType:         serviceType,
+        assignedURS:         row[C.ASSIGNED_URS - 1] || '',
+        inProgressDate:      inProgressDate
+                               ? Utilities.formatDate(inProgressDate, 'Asia/Manila', 'yyyy-MM-dd')
+                               : '',
+        deadlineDate:        Utilities.formatDate(deadlineDate, 'Asia/Manila', 'yyyy-MM-dd'),
+        remainingWorkingDays: remaining,
+        isOverdue:           remaining < 0,
+      });
+    }
+
+    return { success: true, deadlines: deadlines };
+  } catch (e) {
+    return { success: false, message: e.message, deadlines: [] };
+  }
+}
+
+// =============================================================================
+// setURSAvailabilityInternal — Writes Availability and Reason to URS_Registry
+// Called by: onEdit (automatic), doPost setURSAvailability (from URS Portal)
+// @param {string} ursName - Must match 'Full Name' column exactly
+// @param {string} availability - 'Available' | 'Unavailable'
+// @param {string} reason - Free-text reason (optional)
+// =============================================================================
+function setURSAvailabilityInternal(ursName, availability, reason) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+    if (!sheet) return { success: false, message: 'URS_Registry sheet not found' };
+
+    const data = sheet.getDataRange().getValues();
+    const UC = CONFIG.URS_COL;
+
+    for (let i = 1; i < data.length; i++) {
+      const fullName = (data[i][UC.FULL_NAME - 1] || '').toString().trim();
+      if (fullName.toLowerCase() === ursName.toLowerCase()) {
+        const rowNum = i + 1;
+
+        // Only update reason if a non-empty string is provided, unless
+        // switching to Available (in which case clear the reason).
+        sheet.getRange(rowNum, UC.AVAILABILITY).setValue(availability);
+        if (availability === 'Available') {
+          // When marked available, clear the reason unless explicitly provided
+          sheet.getRange(rowNum, UC.AVAILABILITY_REASON).setValue(reason || '');
+        } else if (reason) {
+          sheet.getRange(rowNum, UC.AVAILABILITY_REASON).setValue(reason);
+        }
+
+        Logger.log(`setURSAvailabilityInternal: ${ursName} → ${availability} (${reason || 'no reason'})`);
+        return { success: true, message: 'Availability updated', ursName: fullName, availability, reason };
       }
     }
+
+    return { success: false, message: 'URS not found: ' + ursName };
+  } catch (e) {
+    return { success: false, message: e.message };
   }
-
-  return workingDays;
-}
-
-/**
- * getTATForService — Returns TAT in working days for a given service type
- * @param {string} serviceType - The service type
- * @returns {number} - TAT in working days
- */
-function getTATForService(serviceType) {
-  const T = CONFIG.TAT;
-  if (!serviceType) return T.OTHERS;
-
-  const svc = serviceType.toLowerCase();
-
-  if (svc.includes('full statistical')) return T.FULL_ANALYSIS;
-  if (svc.includes('validity') || svc.includes('reliability')) return T.VALIDITY_RELIABILITY;
-  if (svc.includes('consultation')) return T.CONSULTATION;
-  if (svc.includes('mentoring')) return T.MENTORING;
-  return T.OTHERS;
-}
-
-/**
- * calculateExpectedCompletion — Calculates expected completion date from assignment date
- * @param {Date} assignmentDate - Date when URS was assigned
- * @param {string} serviceType - Type of service
- * @returns {Date} - Expected completion date
- */
-function calculateExpectedCompletion(assignmentDate, serviceType) {
-  const tat = getTATForService(serviceType);
-  return addWorkingDays(assignmentDate, tat);
 }
 
 // =============================================================================
-// AUTO-STAMP ASSIGNMENT DATE & EXPECTED COMPLETION
-// Triggered when Assigned URS column is filled
+// syncURSAvailabilityForOne — Re-evaluates a single URS's availability
+// Called when a project is completed/cancelled to check if they're now free.
+// A URS is Available only if they have zero 'In Progress' projects.
+// A manually-set Unavailable reason (not 'Working on a project') is preserved.
 // =============================================================================
-function onAssignURS(row, ursName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEET.CLIENTS);
+function syncURSAvailabilityForOne(ursName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const clientsSheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
   const C = CONFIG.COL;
+  const data = clientsSheet.getDataRange().getValues();
 
-  const assignmentDate = new Date();
-  const serviceType = sheet.getRange(row, C.SERVICE).getValue();
-  const expectedCompletion = calculateExpectedCompletion(assignmentDate, serviceType);
-
-  // Set Assignment Date
-  sheet.getRange(row, C.ASSIGNMENT_DATE).setValue(assignmentDate);
-
-  // Set Expected Completion Date
-  sheet.getRange(row, C.EXPECTED_COMPLETION).setValue(expectedCompletion);
-
-  Logger.log(`Auto-stamped assignment dates for row ${row}: Assignment=${assignmentDate}, Expected=${expectedCompletion}`);
-}
-
-// =============================================================================
-// getMonitoringData — Returns monitoring/notification data for Officer Dashboard
-// =============================================================================
-function getMonitoringData() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const C = CONFIG.COL;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const notifications = {
-      overdue: [],      // Past due date, not completed
-      critical: [],     // Due within 2 working days
-      warning: [],      // Due within 5 working days
-      notice: [],       // Due within 10 working days
-      pendingAssignment: [], // Assigned but no dates set
-    };
-
-    let inProgressCount = 0;
-    let completedThisMonth = 0;
-    let completedThisSemester = 0;
-    let totalOngoing = 0;
-
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-
-    // Get semester boundaries
-    const semStartMonth = 8; // August
-    const semStartYear = currentMonth >= 8 ? currentYear : currentYear - 1;
-
-    for (let i = 1; i < data.length; i++) {
-      const recordId = data[i][C.RECORD_ID - 1];
-      if (!recordId) continue;
-
-      const status = data[i][C.STATUS - 1];
-      const payStatus = data[i][C.PAY_STATUS - 1];
-
-      // Count ongoing (In Progress and Assigned)
-      if (status === 'In Progress' && payStatus === 'Paid') {
-        inProgressCount++;
-        totalOngoing++;
-
-        const client = {
-          row: i + 1,
-          recordId: recordId,
-          clientName: data[i][C.CLIENT_NAME - 1],
-          serviceType: data[i][C.SERVICE - 1],
-          assignedURS: data[i][C.ASSIGNED_URS - 1],
-          assignmentDate: data[i][C.ASSIGNMENT_DATE - 1],
-          expectedCompletion: data[i][C.EXPECTED_COMPLETION - 1],
-          status: status,
-        };
-
-        // Check if has expected completion date
-        if (client.expectedCompletion) {
-          const dueDate = new Date(client.expectedCompletion);
-          dueDate.setHours(0, 0, 0, 0);
-
-          const daysRemaining = getWorkingDaysRemaining(dueDate);
-
-          client.daysRemaining = daysRemaining;
-          client.dueDateFormatted = Utilities.formatDate(dueDate, 'Asia/Manila', 'MM/dd/yyyy');
-
-          if (dueDate < today && status !== 'Completed') {
-            // Overdue
-            notifications.overdue.push(client);
-          } else if (daysRemaining <= CONFIG.DEADLINE_WARNING.CRITICAL && status !== 'Completed') {
-            notifications.critical.push(client);
-          } else if (daysRemaining <= CONFIG.DEADLINE_WARNING.WARNING && status !== 'Completed') {
-            notifications.warning.push(client);
-          } else if (daysRemaining <= CONFIG.DEADLINE_WARNING.NOTICE && status !== 'Completed') {
-            notifications.notice.push(client);
-          }
-        } else if (!client.assignmentDate) {
-          notifications.pendingAssignment.push(client);
-        }
-      }
-
-      // Completed counts
-      if (status === 'Completed') {
-        totalOngoing++;
-
-        const completionDate = data[i][C.ASSIGNMENT_DATE - 1]; // Using assignment date as proxy
-        if (completionDate) {
-          const compDate = new Date(completionDate);
-          if (compDate.getMonth() === currentMonth && compDate.getFullYear() === currentYear) {
-            completedThisMonth++;
-          }
-          if (compDate >= new Date(semStartYear, semStartMonth - 1, 1)) {
-            completedThisSemester++;
-          }
-        } else {
-          // Check date column as fallback
-          const dateCol = data[i][C.DATE - 1];
-          if (dateCol) {
-            const d = new Date(dateCol);
-            if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-              completedThisMonth++;
-            }
-          }
-        }
-      }
-
-      // New records today
-      if (payStatus === 'Pending') {
-        totalOngoing++;
-      }
+  // Count active (In Progress) projects for this URS
+  let activeCount = 0;
+  for (let i = 1; i < data.length; i++) {
+    const assigned = (data[i][C.ASSIGNED_URS - 1] || '').toString().trim();
+    const status   = (data[i][C.STATUS - 1] || '').toString().trim();
+    if (assigned.toLowerCase() === ursName.toLowerCase() && status === 'In Progress') {
+      activeCount++;
     }
-
-    return {
-      success: true,
-      notifications: notifications,
-      summary: {
-        totalOngoing: inProgressCount,
-        overdueCount: notifications.overdue.length,
-        criticalCount: notifications.critical.length,
-        warningCount: notifications.warning.length,
-        noticeCount: notifications.notice.length,
-        pendingAssignmentCount: notifications.pendingAssignment.length,
-        completedThisMonth: completedThisMonth,
-        completedThisSemester: completedThisSemester,
-      },
-      tatInfo: {
-        fullAnalysis: CONFIG.TAT.FULL_ANALYSIS + ' working days',
-        validityReliability: CONFIG.TAT.VALIDITY_RELIABILITY + ' working days',
-        consultation: CONFIG.TAT.CONSULTATION > 0 ? CONFIG.TAT.CONSULTATION + ' working days' : 'No fixed TAT',
-        mentoring: CONFIG.TAT.MENTORING > 0 ? CONFIG.TAT.MENTORING + ' working days' : 'No fixed TAT',
-      }
-    };
-  } catch (e) {
-    return { success: false, message: e.message };
   }
-}
 
-// =============================================================================
-// getMonthlyStatistics — Returns monthly and semester statistics for charts
-// =============================================================================
-function getMonthlyStatistics() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
-    const data = sheet.getDataRange().getValues();
-    const C = CONFIG.COL;
+  Logger.log(`syncURSAvailabilityForOne: ${ursName} has ${activeCount} active projects`);
 
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-
-    // Get semester info
-    const semStartMonth = 8; // August
-    const semStartYear = currentMonth >= 8 ? currentYear : currentYear - 1;
-    const semesterLabel = currentMonth >= 8 || currentMonth <= 1 ? 'First Semester' : 'Second Semester';
-    const ayLabel = currentMonth >= 8 ? `${currentYear}-${currentYear + 1}` : `${currentYear - 1}-${currentYear}`;
-
-    // Initialize monthly data for current semester (Aug-Dec or Jan-Jul)
-    const monthlyData = {};
-    const semesterMonths = currentMonth >= 8
-      ? [8, 9, 10, 11, 12]  // Aug-Dec
-      : [1, 2, 3, 4, 5, 6, 7]; // Jan-Jul
-
-    semesterMonths.forEach(month => {
-      const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      monthlyData[month] = {
-        month: monthNames[month],
-        newClients: 0,
-        completed: 0,
-        inProgress: 0,
-        totalFees: 0,
-      };
-    });
-
-    let semesterTotalFees = 0;
-    let semesterTotalClients = 0;
-    let semesterCompleted = 0;
-    let semesterInProgress = 0;
-
-    for (let i = 1; i < data.length; i++) {
-      const recordId = data[i][C.RECORD_ID - 1];
-      if (!recordId) continue;
-
-      const dateVal = data[i][C.DATE - 1];
-      const status = data[i][C.STATUS - 1];
-      const payStatus = data[i][C.PAY_STATUS - 1];
-      const fee = parseFloat(data[i][C.TOTAL_FEE - 1]) || 0;
-
-      if (!dateVal) continue;
-
-      const recordDate = new Date(dateVal);
-      const recordMonth = recordDate.getMonth() + 1; // 1-indexed
-      const recordYear = recordDate.getFullYear();
-
-      // Check if within current semester
-      const isInSemester = (recordYear === semStartYear && semesterMonths.includes(recordMonth)) ||
-                          (recordYear === semStartYear + 1 && currentMonth >= 8 && recordMonth <= 7);
-
-      if (isInSemester && monthlyData[recordMonth]) {
-        monthlyData[recordMonth].newClients++;
-        semesterTotalClients++;
-
-        if (fee > 0) {
-          monthlyData[recordMonth].totalFees += fee;
-          semesterTotalFees += fee;
-        }
-
-        if (status === 'Completed') {
-          monthlyData[recordMonth].completed++;
-          semesterCompleted++;
-        } else if (status === 'In Progress') {
-          monthlyData[recordMonth].inProgress++;
-          semesterInProgress++;
-        }
-      }
-    }
-
-    // Also add "this month" data for current in-progress count
-    const currentMonthData = monthlyData[currentMonth + 1] || monthlyData[currentMonth];
-
-    return {
-      success: true,
-      semester: {
-        label: `${semesterLabel} ${ayLabel}`,
-        totalClients: semesterTotalClients,
-        totalFees: semesterTotalFees,
-        completed: semesterCompleted,
-        inProgress: semesterInProgress,
-        ursShare: semesterTotalFees * CONFIG.URS_PCT,
-        unitShare: semesterTotalFees * CONFIG.UNIT_PCT,
-      },
-      monthly: Object.values(monthlyData),
-      currentMonth: currentMonth + 1,
-      year: currentYear,
-    };
-  } catch (e) {
-    return { success: false, message: e.message };
-  }
-}
-
-// =============================================================================
-// getURSWithDeadline — Returns clients for URS portal with deadline info
-// =============================================================================
-function getURSClientsWithDeadline(ursName) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
-    const data = sheet.getDataRange().getValues();
-    const C = CONFIG.COL;
-
-    const ursClients = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 1; i < data.length; i++) {
-      const assignedURS = data[i][C.ASSIGNED_URS - 1];
-      if (assignedURS !== ursName) continue;
-
-      const status = data[i][C.STATUS - 1];
-      const payStatus = data[i][C.PAY_STATUS - 1];
-
-      // Only show active/paid clients
-      if (payStatus !== 'Paid') continue;
-      if (status === 'Cancelled') continue;
-
-      const assignmentDate = data[i][C.ASSIGNMENT_DATE - 1];
-      const expectedCompletion = data[i][C.EXPECTED_COMPLETION - 1];
-      const serviceType = data[i][C.SERVICE - 1];
-
-      const client = {
-        row: i + 1,
-        'Record ID': data[i][C.RECORD_ID - 1],
-        'Client Name': data[i][C.CLIENT_NAME - 1],
-        'Email': data[i][C.EMAIL - 1],
-        'Research Title': data[i][C.TITLE - 1],
-        'Service Type': serviceType,
-        'Payment Status': payStatus,
-        'Status': status,
-        'URS Share 60% (₱)': data[i][C.URS_SHARE - 1],
-        assignmentDate: assignmentDate
-          ? Utilities.formatDate(new Date(assignmentDate), 'Asia/Manila', 'MM/dd/yyyy')
-          : null,
-        expectedCompletion: expectedCompletion
-          ? Utilities.formatDate(new Date(expectedCompletion), 'Asia/Manila', 'MM/dd/yyyy')
-          : null,
-        tat: getTATForService(serviceType),
-        'Remarks': data[i][C.REMARKS - 1],
-        'Drive Folder URL': data[i][C.DRIVE_FOLDER - 1],
-      };
-
-      // Calculate days remaining
-      if (expectedCompletion) {
-        const dueDate = new Date(expectedCompletion);
-        dueDate.setHours(0, 0, 0, 0);
-        client.daysRemaining = getWorkingDaysRemaining(dueDate);
-        client.isOverdue = dueDate < today && status !== 'Completed';
-        client.isCritical = client.daysRemaining <= CONFIG.DEADLINE_WARNING.CRITICAL && status !== 'Completed';
-        client.isWarning = client.daysRemaining <= CONFIG.DEADLINE_WARNING.WARNING && status !== 'Completed';
-      }
-
-      ursClients.push(client);
-    }
-
-    // Sort by urgency (overdue first, then by days remaining)
-    ursClients.sort((a, b) => {
-      if (a.isOverdue && !b.isOverdue) return -1;
-      if (!a.isOverdue && b.isOverdue) return 1;
-      if (a.daysRemaining !== undefined && b.daysRemaining !== undefined) {
-        return a.daysRemaining - b.daysRemaining;
-      }
-      return 0;
-    });
-
-    const inProgress = ursClients.filter(c => c.status === 'In Progress').length;
-    const completed = ursClients.filter(c => c.status === 'Completed').length;
-    const overdue = ursClients.filter(c => c.isOverdue).length;
-
-    return {
-      success: true,
-      ursName: ursName,
-      clients: ursClients,
-      summary: {
-        total: ursClients.length,
-        inProgress: inProgress,
-        completed: completed,
-        overdue: overdue,
-        urgent: ursClients.filter(c => c.isCritical).length,
-      }
-    };
-  } catch (e) {
-    return { success: false, message: e.message };
-  }
-}
-
-// =============================================================================
-// updateAssignment — Updates assignment date and calculates expected completion
-// =============================================================================
-function updateAssignment(rowNum, assignmentDate, serviceType) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
-    const C = CONFIG.COL;
-
-    const assignDate = assignmentDate ? new Date(assignmentDate) : new Date();
-    const expectedCompletion = calculateExpectedCompletion(assignDate, serviceType);
-
-    sheet.getRange(rowNum, C.ASSIGNMENT_DATE).setValue(assignDate);
-    sheet.getRange(rowNum, C.EXPECTED_COMPLETION).setValue(expectedCompletion);
-
-    return {
-      success: true,
-      assignmentDate: Utilities.formatDate(assignDate, 'Asia/Manila', 'MM/dd/yyyy'),
-      expectedCompletion: Utilities.formatDate(expectedCompletion, 'Asia/Manila', 'MM/dd/yyyy'),
-      tat: getTATForService(serviceType),
-    };
-  } catch (e) {
-    return { success: false, message: e.message };
-  }
-}
-
-// =============================================================================
-// EMAIL REMINDER SYSTEM — Deadline Alerts
-//
-// Reminder schedule:
-//   - Full Statistical Assistance: 7 days before due
-//   - Validity/Reliability: 2 days before due
-//   - Consultation & Mentoring: 3 days before due
-//
-// Only sends if status is NOT 'Completed'
-// =============================================================================
-
-// Reminder thresholds (in working days before due)
-const REMINDER_THRESHOLDS = {
-  FULL_ANALYSIS:         7,  // 7 working days before (for 14-day deadline)
-  VALIDITY_RELIABILITY:   2,  // 2 working days before
-  CONSULTATION:           0,  // No fixed TAT - no reminders
-  MENTORING:             0,  // No fixed TAT - no reminders
-  OTHERS:                5,  // 5 working days before
-};
-
-/**
- * sendDeadlineReminders — Checks all in-progress tasks and sends email reminders
- * Should be run daily via time-driven trigger
- */
-function sendDeadlineReminders() {
-  try {
-    Logger.log('Starting deadline reminder check...');
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const clientsSheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+  if (activeCount === 0) {
+    // URS is free — mark Available and clear system reason
+    // But check if they have a custom manual reason first
     const ursSheet = ss.getSheetByName(CONFIG.SHEET.URS);
-    const data = clientsSheet.getDataRange().getValues();
-    const C = CONFIG.COL;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let remindersSent = 0;
-    const reminderLog = [];
-
-    // Build URS email lookup
-    const ursEmailMap = {};
     const ursData = ursSheet.getDataRange().getValues();
+    const UC = CONFIG.URS_COL;
+
     for (let i = 1; i < ursData.length; i++) {
-      const name = ursData[i][1] ? ursData[i][1].toString().trim() : '';
-      const email = ursData[i][5] ? ursData[i][5].toString().trim() : '';
-      if (name) ursEmailMap[name] = email;
+      const fullName = (ursData[i][UC.FULL_NAME - 1] || '').toString().trim();
+      if (fullName.toLowerCase() === ursName.toLowerCase()) {
+        const currentReason = (ursData[i][UC.AVAILABILITY_REASON - 1] || '').toString().trim();
+        // Only auto-set to Available if the reason was the system-set one
+        if (currentReason === '' || currentReason === 'Working on a project') {
+          setURSAvailabilityInternal(ursName, 'Available', '');
+        }
+        // If they have a custom reason (e.g., "On leave"), leave them as Unavailable
+        break;
+      }
     }
+  }
+  // If activeCount > 0, they remain Unavailable — do nothing
+}
 
-    for (let i = 1; i < data.length; i++) {
-      const recordId = data[i][C.RECORD_ID - 1];
-      if (!recordId) continue;
+// =============================================================================
+// syncAllURSAvailability — Re-evaluates all URS availability from scratch
+// Useful after bulk status updates or manual Officer use from the menu.
+// =============================================================================
+function syncAllURSAvailability() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ursSheet = ss.getSheetByName(CONFIG.SHEET.URS);
+  const clientsSheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+  const UC = CONFIG.URS_COL;
+  const C  = CONFIG.COL;
 
-      const status = data[i][C.STATUS - 1];
-      const payStatus = data[i][C.PAY_STATUS - 1];
+  const ursData     = ursSheet.getDataRange().getValues();
+  const clientsData = clientsSheet.getDataRange().getValues();
 
-      // Skip if already completed or not paid
-      if (status === 'Completed' || status === 'Cancelled') continue;
-      if (payStatus !== 'Paid') continue;
+  // Build a map: ursName (lowercase) → count of In Progress projects
+  const activeMap = {};
+  for (let i = 1; i < clientsData.length; i++) {
+    const assigned = (clientsData[i][C.ASSIGNED_URS - 1] || '').toString().trim().toLowerCase();
+    const status   = (clientsData[i][C.STATUS - 1] || '').toString().trim();
+    if (assigned && status === 'In Progress') {
+      activeMap[assigned] = (activeMap[assigned] || 0) + 1;
+    }
+  }
 
-      const expectedCompletion = data[i][C.EXPECTED_COMPLETION - 1];
-      if (!expectedCompletion) continue;
+  let updated = 0;
+  for (let i = 1; i < ursData.length; i++) {
+    const fullName = (ursData[i][UC.FULL_NAME - 1] || '').toString().trim();
+    if (!fullName) continue;
 
-      const dueDate = new Date(expectedCompletion);
-      dueDate.setHours(0, 0, 0, 0);
+    const lowerName     = fullName.toLowerCase();
+    const activeCount   = activeMap[lowerName] || 0;
+    const currentAvail  = (ursData[i][UC.AVAILABILITY - 1] || '').toString().trim();
+    const currentReason = (ursData[i][UC.AVAILABILITY_REASON - 1] || '').toString().trim();
+    const rowNum        = i + 1;
 
-      const serviceType = data[i][C.SERVICE - 1] || '';
-      const clientName = data[i][C.CLIENT_NAME - 1] || '';
-      const researchTitle = data[i][C.TITLE - 1] || '';
-      const assignedURS = data[i][C.ASSIGNED_URS - 1] || '';
-
-      // Get threshold based on service type
-      const threshold = getReminderThreshold(serviceType);
-      const daysRemaining = getWorkingDaysRemaining(dueDate);
-
-      Logger.log(`${recordId}: ${serviceType}, daysRemaining=${daysRemaining}, threshold=${threshold}`);
-
-      // Check if reminder should be sent
-      if (daysRemaining <= threshold && daysRemaining > 0) {
-        // Check if we already sent a reminder today (avoid duplicates)
-        const todayStr = Utilities.formatDate(today, 'Asia/Manila', 'yyyy-MM-dd');
-        const reminderKey = `${recordId}_${todayStr}_${threshold}day`;
-
-        // Check if reminder was already sent today
-        const lastReminder = CacheService.getUserCache().get(reminderKey);
-
-        if (!lastReminder) {
-          // Get URS email
-          const ursEmail = ursEmailMap[assignedURS] || '';
-
-          // Prepare reminder details
-          const reminderInfo = {
-            recordId: recordId,
-            clientName: clientName,
-            researchTitle: researchTitle,
-            serviceType: serviceType,
-            assignedURS: assignedURS,
-            dueDate: Utilities.formatDate(dueDate, 'Asia/Manila', 'MMMM dd, yyyy'),
-            daysRemaining: daysRemaining,
-            threshold: threshold,
-          };
-
-          // Send reminder emails
-          const emailResult = sendReminderEmails(reminderInfo, ursEmail);
-
-          if (emailResult.sent) {
-            remindersSent++;
-            reminderLog.push(`${recordId}: ${assignedURS || 'No URS'} - ${daysRemaining} days left`);
-            // Cache that we sent a reminder (expires in 2 days to prevent duplicates)
-            CacheService.getUserCache().put(reminderKey, 'sent', 172800);
-          }
+    if (activeCount > 0) {
+      // Has active projects → Unavailable
+      if (currentAvail !== 'Unavailable' || currentReason !== 'Working on a project') {
+        // Only overwrite if current reason is blank or the system default
+        if (currentReason === '' || currentReason === 'Working on a project') {
+          ursSheet.getRange(rowNum, UC.AVAILABILITY).setValue('Unavailable');
+          ursSheet.getRange(rowNum, UC.AVAILABILITY_REASON).setValue('Working on a project');
+          updated++;
+        }
+      }
+    } else {
+      // No active projects → Available (only if reason is system-generated or blank)
+      if (currentReason === '' || currentReason === 'Working on a project') {
+        if (currentAvail !== 'Available') {
+          ursSheet.getRange(rowNum, UC.AVAILABILITY).setValue('Available');
+          ursSheet.getRange(rowNum, UC.AVAILABILITY_REASON).setValue('');
+          updated++;
         }
       }
     }
-
-    Logger.log(`Deadline reminders sent: ${remindersSent}`);
-
-    // Send summary to ISM Officer
-    if (remindersSent > 0) {
-      GmailApp.sendEmail(
-        CONFIG.ISM_OFFICER_EMAIL,
-        `[ISRM] Deadline Reminder Summary - ${Utilities.formatDate(today, 'Asia/Manila', 'MMMM dd, yyyy')}`,
-        `Daily Deadline Reminder Report\n` +
-        `${'='.repeat(50)}\n\n` +
-        `Date: ${Utilities.formatDate(today, 'Asia/Manila', 'MMMM dd, yyyy')}\n` +
-        `Total Reminders Sent: ${remindersSent}\n\n` +
-        `Reminders Sent:\n` +
-        reminderLog.map(r => `  • ${r}`).join('\n') +
-        `\n\n${'='.repeat(50)}\n` +
-        `ISRM Digital Operations System\n` +
-        `Automated Daily Reminder`
-      );
-    }
-
-    return {
-      success: true,
-      remindersSent: remindersSent,
-      log: reminderLog,
-    };
-  } catch (e) {
-    Logger.log('Error in sendDeadlineReminders: ' + e.message);
-    return { success: false, message: e.message };
   }
-}
-
-/**
- * getReminderThreshold — Returns reminder threshold in working days for a service type
- */
-function getReminderThreshold(serviceType) {
-  if (!serviceType) return REMINDER_THRESHOLDS.OTHERS;
-
-  const svc = serviceType.toLowerCase();
-
-  if (svc.includes('full statistical')) return REMINDER_THRESHOLDS.FULL_ANALYSIS;
-  if (svc.includes('validity') || svc.includes('reliability')) return REMINDER_THRESHOLDS.VALIDITY_RELIABILITY;
-  if (svc.includes('consultation')) return REMINDER_THRESHOLDS.CONSULTATION;
-  if (svc.includes('mentoring')) return REMINDER_THRESHOLDS.MENTORING;
-  return REMINDER_THRESHOLDS.OTHERS;
-}
-
-/**
- * sendReminderEmails — Sends reminder emails to URS and ISM Officer
- */
-function sendReminderEmails(reminderInfo, ursEmail) {
-  try {
-    const { recordId, clientName, researchTitle, serviceType, assignedURS, dueDate, daysRemaining, threshold } = reminderInfo;
-
-    const urgencyLevel = daysRemaining <= 2 ? 'URGENT' : daysRemaining <= 5 ? 'IMPORTANT' : 'REMINDER';
-
-    const subject = `[${urgencyLevel}] ${recordId} - ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} until deadline`;
-
-    // Email body for URS
-    const ursEmailBody =
-      `Dear ${assignedURS},\n\n` +
-      `This is a reminder that the deadline for your assigned statistical service is approaching.\n\n` +
-      `${'─'.repeat(50)}\n` +
-      `RECORD DETAILS\n` +
-      `${'─'.repeat(50)}\n` +
-      `Record ID       : ${recordId}\n` +
-      `Client Name     : ${clientName}\n` +
-      `Research Title  : ${researchTitle}\n` +
-      `Service Type    : ${serviceType}\n` +
-      `Due Date        : ${dueDate}\n` +
-      `Days Remaining  : ${daysRemaining} working day${daysRemaining !== 1 ? 's' : ''}\n` +
-      `${'─'.repeat(50)}\n\n` +
-      `Please ensure that the analysis is completed and the client is attended to before the deadline.\n\n` +
-      `If you have any concerns or need assistance, please contact the ISM Officer immediately.\n\n` +
-      `ISM Officer: ${CONFIG.ISM_OFFICER_EMAIL}\n\n` +
-      `This is an automated reminder from the ISRM Digital Operations System.\n` +
-      `Please do not reply to this email.\n`;
-
-    // Email body for ISM Officer
-    const officerEmailBody =
-      `[${urgencyLevel}] Deadline Reminder\n\n` +
-      `A deadline reminder has been sent to the assigned URS.\n\n` +
-      `${'─'.repeat(50)}\n` +
-      `RECORD DETAILS\n` +
-      `${'─'.repeat(50)}\n` +
-      `Record ID       : ${recordId}\n` +
-      `Client Name     : ${clientName}\n` +
-      `Research Title  : ${researchTitle}\n` +
-      `Service Type    : ${serviceType}\n` +
-      `Assigned URS    : ${assignedURS || 'Not assigned'}\n` +
-      `Due Date        : ${dueDate}\n` +
-      `Days Remaining  : ${daysRemaining} working day${daysRemaining !== 1 ? 's' : ''}\n` +
-      `Reminder Type   : ${threshold}-day reminder\n` +
-      `${'─'.repeat(50)}\n\n` +
-      `ACTION REQUIRED:\n` +
-      `• Monitor this task in the ISRM Dashboard\n` +
-      `• Follow up with ${assignedURS || 'the assigned URS'} if needed\n` +
-      `• Ensure client is updated on progress\n\n` +
-      `Dashboard: ${SpreadsheetApp.getActiveSpreadsheet().getUrl()}\n\n` +
-      `ISRM Digital Operations System\n` +
-      `Automated Daily Reminder`;
-
-    // Send to URS if email is available
-    if (ursEmail && ursEmail.includes('@')) {
-      GmailApp.sendEmail(ursEmail, subject + ' [Action Required]', ursEmailBody);
-      Logger.log(`Sent reminder to URS: ${ursEmail}`);
-    } else if (assignedURS) {
-      Logger.log(`URS email not found for: ${assignedURS}`);
-      // Forward to ISM Officer to notify manually
-      GmailApp.sendEmail(
-        CONFIG.ISM_OFFICER_EMAIL,
-        `[WARNING] ${recordId} - URS Email Not Found`,
-        `Could not send deadline reminder to URS "${assignedURS}" because no email was found in the URS_Registry sheet.\n\n` +
-        `Please update the URS email address and follow up manually.\n\n` +
-        `Record: ${recordId} - ${clientName}\n` +
-        `Due: ${dueDate} (${daysRemaining} days remaining)`
-      );
-    }
-
-    // Always CC ISM Officer
-    GmailApp.sendEmail(CONFIG.ISM_OFFICER_EMAIL, subject, officerEmailBody);
-    Logger.log(`Sent reminder to ISM Officer`);
-
-    return { sent: true };
-  } catch (e) {
-    Logger.log('Error sending reminder emails: ' + e.message);
-    return { sent: false, error: e.message };
-  }
-}
-
-/**
- * setupDeadlineReminderTrigger — Creates daily time-driven trigger for reminders
- * Run this once from the ISRM Operations menu
- */
-function setupDeadlineReminderTrigger() {
-  // Delete existing triggers for this function
-  ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === 'sendDeadlineReminders')
-    .forEach(t => ScriptApp.deleteTrigger(t));
-
-  // Create new trigger to run daily at 8:00 AM
-  ScriptApp.newTrigger('sendDeadlineReminders')
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
 
   SpreadsheetApp.getUi().alert(
-    '✅  Deadline Reminder System Activated!\n\n' +
-    'Email reminders will now be sent daily at 8:00 AM (Manila time).\n\n' +
-    'Reminder Schedule:\n' +
-    `  • Full Statistical Assistance: 7 days before due\n` +
-    `  • Validity/Reliability: 2 days before due\n` +
-    `  • Consultation & Mentoring: 3 days before due\n\n` +
-    'Reminders are sent to:\n' +
-    '  • The assigned URS\n' +
-    '  • The ISM Officer\n\n' +
-    'Note: Reminders are NOT sent for completed tasks.'
+    `✅  URS Availability Synced!\n\n` +
+    `${updated} URS record(s) were updated based on current project statuses.`
   );
 }
 
-/**
- * removeDeadlineReminderTrigger — Removes the daily reminder trigger
- */
-function removeDeadlineReminderTrigger() {
-  const triggers = ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === 'sendDeadlineReminders');
+// =============================================================================
+// checkAndSendDeadlineReminders — Daily trigger function
+// • Sends a warning email when exactly 2 working days remain before deadline
+// • Sends a daily overdue email when the deadline has been missed
+// Both the URS and the ISM Officer receive the email.
+// =============================================================================
+function checkAndSendDeadlineReminders() {
+  Logger.log('checkAndSendDeadlineReminders: Starting daily check...');
 
-  if (triggers.length === 0) {
-    SpreadsheetApp.getUi().alert('No deadline reminder trigger found to remove.');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+  if (!sheet) {
+    Logger.log('checkAndSendDeadlineReminders: Clients sheet not found');
     return;
   }
 
-  triggers.forEach(t => ScriptApp.deleteTrigger(t));
+  const data = sheet.getDataRange().getValues();
+  const C = CONFIG.COL;
 
-  SpreadsheetApp.getUi().alert('✅  Deadline reminder trigger removed. You will no longer receive automatic reminders.');
-}
+  // Collect URS emails from URS_Registry for lookup
+  const ursEmailMap = buildURSEmailMap();
 
-/**
- * testDeadlineReminders — Manually trigger reminder check (for testing)
- */
-function testDeadlineReminders() {
-  const result = sendDeadlineReminders();
-  Logger.log('Test result: ' + JSON.stringify(result));
-  SpreadsheetApp.getUi().alert(
-    result.success
-      ? `✅  Test Complete\n\nReminders sent: ${result.remindersSent}\n\nCheck the log for details.`
-      : `❌  Error\n\n${result.message}`
-  );
-}
+  let warningsSent = 0;
+  let overduesSent = 0;
 
-// =============================================================================
-// AVAILABLE CLIENTS - For URS Self-Service Portal
-// =============================================================================
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[C.RECORD_ID - 1]) continue;
 
-/**
- * getAvailableClients — Returns clients ready to be claimed by URS
- * Shows clients who have paid but are not yet assigned to any URS
- */
-function getAvailableClients() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
-    const data = sheet.getDataRange().getValues();
-    const C = CONFIG.COL;
+    const status      = (row[C.STATUS - 1] || '').toString().trim();
+    const deadlineRaw = row[C.DEADLINE_DATE - 1];
 
-    const availableClients = [];
+    // Only process In Progress records with a deadline
+    if (status !== 'In Progress' || !deadlineRaw) continue;
 
-    for (let i = 1; i < data.length; i++) {
-      const recordId = data[i][C.RECORD_ID - 1];
-      if (!recordId) continue;
-
-      const payStatus = data[i][C.PAY_STATUS - 1];
-      const assignedURS = data[i][C.ASSIGNED_URS - 1];
-      const status = data[i][C.STATUS - 1];
-
-      // Available if: Paid, No URS assigned, Not cancelled/completed
-      if (payStatus === 'Paid' && (!assignedURS || assignedURS === '') && status !== 'Cancelled' && status !== 'Completed') {
-        const client = {
-          row: i + 1,
-          'Record ID': recordId,
-          'Client Name': data[i][C.CLIENT_NAME - 1],
-          'Email': data[i][C.EMAIL - 1],
-          'Contact No.': data[i][C.CONTACT - 1],
-          'Research Title': data[i][C.TITLE - 1],
-          'Research Objectives': data[i][C.RESEARCH_OBJECTIVES - 1] || '',
-          'Research Questions': data[i][C.RESEARCH_QUESTIONS - 1] || '',
-          'Service Type': data[i][C.SERVICE - 1],
-          'Course/Department': data[i][C.DEPARTMENT - 1],
-          'Total Fee (₱)': data[i][C.TOTAL_FEE - 1],
-          'Date': data[i][C.DATE - 1] ? Utilities.formatDate(new Date(data[i][C.DATE - 1]), 'Asia/Manila', 'MM/dd/yyyy') : '',
-        };
-        availableClients.push(client);
-      }
+    let deadlineDate;
+    try {
+      deadlineDate = new Date(deadlineRaw);
+      if (isNaN(deadlineDate.getTime())) continue;
+    } catch (e) {
+      continue;
     }
 
-    return {
-      success: true,
-      clients: availableClients,
-      count: availableClients.length
+    const remaining   = countRemainingWorkingDays(deadlineDate);
+    const recordId    = row[C.RECORD_ID - 1]    || '';
+    const clientName  = row[C.CLIENT_NAME - 1]  || '';
+    const title       = row[C.TITLE - 1]        || '';
+    const serviceType = row[C.SERVICE - 1]      || '';
+    const assignedURS = row[C.ASSIGNED_URS - 1] || '';
+    const ursEmail    = ursEmailMap[assignedURS.toLowerCase()] || '';
+    const deadlineStr = Utilities.formatDate(deadlineDate, 'Asia/Manila', 'MMMM d, yyyy');
+
+    if (remaining === 2) {
+      // ── 2-day warning ──────────────────────────────────────────────────
+      const subject = `[ISRM] ⚠️ Deadline in 2 Days — ${recordId}`;
+      const body =
+`Dear ${assignedURS || 'URS'},
+
+This is a reminder that the turnaround deadline for the following project is in 2 WORKING DAYS.
+
+── PROJECT DETAILS ────────────────────────────────────
+Record ID    : ${recordId}
+Client       : ${clientName}
+Research     : ${title}
+Service Type : ${serviceType}
+Deadline     : ${deadlineStr}
+Remaining    : 2 working days
+────────────────────────────────────────────────────
+
+Please ensure the statistical work is completed and submitted to the client on time.
+
+If you need assistance or an extension, contact the ISRM Officer immediately:
+📧 ${CONFIG.ISM_OFFICER_EMAIL}
+📞 (074) 444-8246 to 48 local 387
+
+ISRM Unit — Saint Louis University · Baguio City 2600`;
+
+      // Send to URS
+      if (ursEmail) {
+        GmailApp.sendEmail(ursEmail, subject, body);
+        Logger.log(`2-day warning sent to ${ursEmail} for ${recordId}`);
+      }
+      // Always send to Officer
+      GmailApp.sendEmail(CONFIG.ISM_OFFICER_EMAIL, subject,
+        `[Officer Copy]\n\n` + body + `\n\nAssigned URS: ${assignedURS} (${ursEmail || 'no email on file'})`
+      );
+      warningsSent++;
+
+    } else if (remaining < 0) {
+      // ── Overdue daily alert ────────────────────────────────────────────
+      const daysOverdue = Math.abs(remaining);
+      const subject = `[ISRM] 🚨 OVERDUE ${daysOverdue}d — ${recordId}`;
+      const body =
+`Dear ${assignedURS || 'URS'},
+
+The following project is now OVERDUE by ${daysOverdue} working day${daysOverdue === 1 ? '' : 's'}.
+
+── PROJECT DETAILS ────────────────────────────────────
+Record ID    : ${recordId}
+Client       : ${clientName}
+Research     : ${title}
+Service Type : ${serviceType}
+Deadline     : ${deadlineStr} (MISSED)
+Days Overdue : ${daysOverdue} working day${daysOverdue === 1 ? '' : 's'}
+────────────────────────────────────────────────────
+
+Please complete the work immediately and update the project status to "Completed"
+in your URS Dashboard, or contact the ISRM Officer to discuss next steps.
+
+📧 ${CONFIG.ISM_OFFICER_EMAIL}
+📞 (074) 444-8246 to 48 local 387
+
+ISRM Unit — Saint Louis University · Baguio City 2600`;
+
+      if (ursEmail) {
+        GmailApp.sendEmail(ursEmail, subject, body);
+        Logger.log(`Overdue alert sent to ${ursEmail} for ${recordId} (${daysOverdue}d overdue)`);
+      }
+      GmailApp.sendEmail(CONFIG.ISM_OFFICER_EMAIL, subject,
+        `[Officer Copy]\n\n` + body + `\n\nAssigned URS: ${assignedURS} (${ursEmail || 'no email on file'})`
+      );
+      overduesSent++;
+    }
+  }
+
+  Logger.log(`checkAndSendDeadlineReminders: Done. Warnings: ${warningsSent}, Overdues: ${overduesSent}`);
+}
+
+// =============================================================================
+// HELPER — buildURSEmailMap
+// Returns an object mapping ursName.toLowerCase() → email
+// =============================================================================
+function buildURSEmailMap() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+  if (!sheet) return {};
+
+  const data = sheet.getDataRange().getValues();
+  const UC = CONFIG.URS_COL;
+  const map = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const name  = (data[i][UC.FULL_NAME - 1] || '').toString().trim();
+    const email = (data[i][UC.EMAIL - 1]     || '').toString().trim();
+    if (name && email) {
+      map[name.toLowerCase()] = email;
+    }
+  }
+
+  return map;
+}
+
+// =============================================================================
+// CONTENT MANAGEMENT — addContentRow / updateContentRow / deleteContentRow
+// These back the Officer Portal's Content Manager for Announcements,
+// LiveUpdates, and Resources sheets.
+//
+// Column layout per sheet (must match what getAnnouncements/getLiveUpdates/
+// getResources read):
+//
+//   Announcements : Type | Badge | BadgeColor | Date | Title | Body | Link
+//   LiveUpdates   : Title | Description | Link | Date | Category
+//   Resources     : Category | Title | Description | Link | Tags
+// =============================================================================
+
+/**
+ * COLUMN MAP — maps field key → column index (1-based) for each sheet
+ */
+var CONTENT_COLS = {
+  Announcements: {
+    type: 1, badge: 2, badgeColor: 3, date: 4, title: 5, body: 6, link: 7,
+  },
+  LiveUpdates: {
+    title: 1, description: 2, link: 3, date: 4, category: 5,
+  },
+  Resources: {
+    category: 1, title: 2, description: 3, link: 4, tags: 5,
+  },
+};
+
+/**
+ * resolveContentSheet — Gets or creates the sheet for a given content type.
+ * Creates the sheet with appropriate headers if it does not exist.
+ */
+function resolveContentSheet(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    const headers = {
+      Announcements: ['Type', 'Badge', 'BadgeColor', 'Date', 'Title', 'Body', 'Link'],
+      LiveUpdates:   ['Title', 'Description', 'Link', 'Date', 'Category'],
+      Resources:     ['Category', 'Title', 'Description', 'Link', 'Tags'],
     };
+    const h = headers[sheetName];
+    if (h) {
+      sheet.getRange(1, 1, 1, h.length)
+        .setValues([h])
+        .setFontWeight('bold')
+        .setBackground('#1A3666')
+        .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+    Logger.log('resolveContentSheet: Created new sheet ' + sheetName);
+  }
+
+  return sheet;
+}
+
+/**
+ * rowToValues — Converts a field object into an ordered value array
+ * based on the column map for the given sheet.
+ */
+function rowToValues(sheetName, rowObj) {
+  const colMap = CONTENT_COLS[sheetName];
+  if (!colMap) throw new Error('Unknown content sheet: ' + sheetName);
+
+  const maxCol = Math.max.apply(null, Object.values(colMap));
+  const values = new Array(maxCol).fill('');
+
+  Object.entries(colMap).forEach(function(entry) {
+    const key = entry[0];
+    const col = entry[1];
+    let val = rowObj[key] !== undefined ? rowObj[key] : '';
+    // Tags may come as an array — join to comma-separated string for storage
+    if (Array.isArray(val)) val = val.join(', ');
+    values[col - 1] = val;
+  });
+
+  return values;
+}
+
+/**
+ * addContentRow — Appends a new row to the specified content sheet.
+ * @param {string} sheetName  'Announcements' | 'LiveUpdates' | 'Resources'
+ * @param {object} row        Field key-value pairs
+ */
+function addContentRow(sheetName, row) {
+  try {
+    const sheet = resolveContentSheet(sheetName);
+    const values = rowToValues(sheetName, row);
+    sheet.appendRow(values);
+    Logger.log('addContentRow: Added row to ' + sheetName);
+    return { success: true, message: 'Item added to ' + sheetName };
   } catch (e) {
+    Logger.log('addContentRow error: ' + e.message);
     return { success: false, message: e.message };
   }
 }
 
 /**
- * claimClient — Allows a URS to claim an available client
- * @param {string} recordId - The Record ID to claim
- * @param {string} ursName - The URS name claiming the client
+ * updateContentRow — Overwrites an existing row in the content sheet.
+ * @param {string} sheetName  Sheet to update
+ * @param {number} rowNum     1-indexed row number (row 1 = header, so data starts at 2)
+ * @param {object} row        Updated field key-value pairs
  */
-function claimClient(recordId, ursName) {
+function updateContentRow(sheetName, rowNum, row) {
   try {
+    if (!rowNum || rowNum < 2) {
+      return { success: false, message: 'Invalid row number: ' + rowNum };
+    }
+    const sheet = resolveContentSheet(sheetName);
+    const values = rowToValues(sheetName, row);
+    sheet.getRange(rowNum, 1, 1, values.length).setValues([values]);
+    Logger.log('updateContentRow: Updated row ' + rowNum + ' in ' + sheetName);
+    return { success: true, message: 'Item updated in ' + sheetName };
+  } catch (e) {
+    Logger.log('updateContentRow error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * deleteContentRow — Deletes a row from the content sheet (shifts rows up).
+ * @param {string} sheetName  Sheet to delete from
+ * @param {number} rowNum     1-indexed row number to delete
+ */
+function deleteContentRow(sheetName, rowNum) {
+  try {
+    if (!rowNum || rowNum < 2) {
+      return { success: false, message: 'Cannot delete header row or invalid row: ' + rowNum };
+    }
+    const sheet = resolveContentSheet(sheetName);
+    if (rowNum > sheet.getLastRow()) {
+      return { success: false, message: 'Row ' + rowNum + ' does not exist (sheet has ' + sheet.getLastRow() + ' rows)' };
+    }
+    sheet.deleteRow(rowNum);
+    Logger.log('deleteContentRow: Deleted row ' + rowNum + ' from ' + sheetName);
+    return { success: true, message: 'Item deleted from ' + sheetName };
+  } catch (e) {
+    Logger.log('deleteContentRow error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+// =============================================================================
+// URS PASSWORD MANAGEMENT
+// Password is stored in Column J (index 10, 1-based) of URS_Registry.
+// The Officer sets an initial password per URS directly in the sheet.
+// The URS can change their own password from the URS Portal.
+// The Officer can reset any URS password (verified by Officer portal password).
+//
+// Security note: Passwords are stored as plain text in the Google Sheet,
+// which is protected by Google account access controls. This is consistent
+// with the existing system design. For higher security, use Google OAuth
+// or a proper identity provider in a future version.
+// =============================================================================
+
+// Column N in URS_Registry = index 14 (1-based)
+// Layout: A=URS ID, B=Full Name, C=Department, D=Highest Degree,
+//         E=Specialization, F=Email, G=Contact, H=Available Days/Hours,
+//         I=Status, J=AY Appointed, K=Notes, L=Availability,
+//         M=Availability Reason, N=Password
+var URS_PASSWORD_COL = 14;
+// Officer password (same as the web portal) — used to authorise resets
+var OFFICER_PORTAL_PASSWORD = 'ISRM_R3s3@rch';
+
+/**
+ * changeURSPasswordFn — Allows a URS to change their own password.
+ * Requires current password to match before updating.
+ * Called from the URS Portal via POST action=changeURSPassword.
+ *
+ * @param {string} ursName        Must match Full Name in URS_Registry
+ * @param {string} email          Must match Email in URS_Registry
+ * @param {string} currentPassword The URS's existing password
+ * @param {string} newPassword     The desired new password
+ */
+function changeURSPasswordFn(ursName, email, currentPassword, newPassword) {
+  try {
+    if (!ursName || !email || !currentPassword || !newPassword) {
+      return { success: false, message: 'All fields are required.' };
+    }
+    if (newPassword.length < 8) {
+      return { success: false, message: 'New password must be at least 8 characters.' };
+    }
+    if (currentPassword === newPassword) {
+      return { success: false, message: 'New password must be different from the current password.' };
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+    const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+    if (!sheet) return { success: false, message: 'URS_Registry sheet not found.' };
+
     const data = sheet.getDataRange().getValues();
-    const C = CONFIG.COL;
+    const UC = CONFIG.URS_COL;
+
+    const inputName  = ursName.toString().trim().toLowerCase();
+    const inputEmail = email.toString().trim().toLowerCase();
 
     for (let i = 1; i < data.length; i++) {
-      if (data[i][C.RECORD_ID - 1] === recordId) {
-        const rowNum = i + 1;
-        const currentURS = data[i][C.ASSIGNED_URS - 1];
-        const status = data[i][C.STATUS - 1];
+      const fullName   = (data[i][UC.FULL_NAME - 1] || '').toString().trim();
+      const ursEmail   = (data[i][UC.EMAIL - 1]     || '').toString().trim();
+      const storedPass = (data[i][URS_PASSWORD_COL - 1] || '').toString().trim();
+      const status     = (data[i][UC.STATUS - 1]    || '').toString().trim();
 
-        // Check if already assigned
-        if (currentURS && currentURS !== '') {
-          return { success: false, message: 'Client is already assigned to ' + currentURS };
+      if (fullName.toLowerCase() === inputName && ursEmail.toLowerCase() === inputEmail) {
+        if (status !== 'Active') {
+          return { success: false, message: 'Your account is not active. Contact the ISRM Officer.' };
         }
-
-        // Check if cancelled/completed
-        if (status === 'Cancelled' || status === 'Completed') {
-          return { success: false, message: 'This client is no longer available' };
+        // Validate current password
+        if (storedPass && storedPass !== currentPassword) {
+          return { success: false, message: 'Current password is incorrect.' };
         }
+        // Update password
+        sheet.getRange(i + 1, URS_PASSWORD_COL).setValue(newPassword);
+        Logger.log('changeURSPasswordFn: Password changed for ' + fullName);
+        return { success: true, message: 'Password changed successfully.' };
+      }
+    }
 
-        // Assign the URS
-        sheet.getRange(rowNum, C.ASSIGNED_URS).setValue(ursName);
-        sheet.getRange(rowNum, C.STATUS).setValue('In Progress');
+    return { success: false, message: 'URS not found. Check your name and email.' };
+  } catch (e) {
+    Logger.log('changeURSPasswordFn error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
 
-        // Auto-stamp assignment date and expected completion
-        onAssignURS(rowNum, ursName);
+/**
+ * resetURSPasswordFn — Allows the ISM Officer to reset any URS's password.
+ * Requires the Officer portal password for authorisation.
+ * Called from the Officer Portal via POST action=resetURSPassword.
+ *
+ * @param {string} ursName        URS Full Name to reset
+ * @param {string} newPassword    New password to set (officer chooses this)
+ * @param {string} officerPassword Must match OFFICER_PORTAL_PASSWORD
+ */
+function resetURSPasswordFn(ursName, newPassword, officerPassword) {
+  try {
+    if (!ursName || !newPassword || !officerPassword) {
+      return { success: false, message: 'All fields are required.' };
+    }
+    // Verify Officer's own password before allowing reset
+    if (officerPassword !== OFFICER_PORTAL_PASSWORD) {
+      return { success: false, message: 'Invalid Officer password. Reset not authorised.' };
+    }
+    if (newPassword.length < 8) {
+      return { success: false, message: 'New password must be at least 8 characters.' };
+    }
 
-        // Send notification to URS
-        sendURSNotification(rowNum, ursName);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+    if (!sheet) return { success: false, message: 'URS_Registry sheet not found.' };
 
-        Logger.log(`URS ${ursName} claimed client ${recordId}`);
+    const data = sheet.getDataRange().getValues();
+    const UC = CONFIG.URS_COL;
+    const inputName = ursName.toString().trim().toLowerCase();
+
+    for (let i = 1; i < data.length; i++) {
+      const fullName = (data[i][UC.FULL_NAME - 1] || '').toString().trim();
+      if (fullName.toLowerCase() === inputName) {
+        sheet.getRange(i + 1, URS_PASSWORD_COL).setValue(newPassword);
+        Logger.log('resetURSPasswordFn: Password reset for ' + fullName + ' by Officer');
+
+        // Notify URS by email about the reset
+        const ursEmail = (data[i][UC.EMAIL - 1] || '').toString().trim();
+        if (ursEmail) {
+          try {
+            GmailApp.sendEmail(
+              ursEmail,
+              '[SLU ISRM] Your URS Portal Password Has Been Reset',
+              'Dear ' + fullName + ',\n\n' +
+              'The ISRM Officer has reset your URS Portal password.\n\n' +
+              'Your new temporary password is: ' + newPassword + '\n\n' +
+              'Please log in and change your password immediately.\n\n' +
+              'If you did not request this reset, contact the ISRM Officer:\n' +
+              '  Email: ' + CONFIG.ISM_OFFICER_EMAIL + '\n' +
+              '  Phone: (074) 444-8246 to 48 local 387\n\n' +
+              'ISRM Unit — Saint Louis University · Baguio City 2600'
+            );
+            Logger.log('resetURSPasswordFn: Notification sent to ' + ursEmail);
+          } catch (emailErr) {
+            Logger.log('resetURSPasswordFn: Could not send email — ' + emailErr.message);
+          }
+        }
 
         return {
           success: true,
-          message: 'Client claimed successfully!',
-          recordId: recordId,
-          assignedURS: ursName
+          message: 'Password reset for ' + fullName + '.' + (ursEmail ? ' Notification sent to ' + ursEmail + '.' : ' No email on file — inform them manually.'),
         };
       }
     }
 
+    return { success: false, message: 'URS "' + ursName + '" not found in URS_Registry.' };
+  } catch (e) {
+    Logger.log('resetURSPasswordFn error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * setupURSPasswordColumn — One-time setup helper.
+ * Adds "Password" as the header for Column N (index 14) in URS_Registry.
+ * Run from the menu or manually after first deployment.
+ */
+function setupURSPasswordColumn() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SHEET.URS);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('URS_Registry sheet not found. Run Initialize Dashboard first.');
+    return;
+  }
+
+  const current = sheet.getRange(1, URS_PASSWORD_COL).getValue();
+  if (!current) {
+    sheet.getRange(1, URS_PASSWORD_COL)
+      .setValue('Password')
+      .setFontWeight('bold')
+      .setBackground('#1A3666')
+      .setFontColor('#FFFFFF');
+    SpreadsheetApp.getUi().alert(
+      '✅  Password column (Column N) added to URS_Registry.\n\n' +
+      'Enter each URS\'s initial password in Column N.\n' +
+      'The URS can change their own password from the URS Portal.\n' +
+      'You can reset any URS password from the Officer Portal.'
+    );
+  } else if (current === 'Password') {
+    SpreadsheetApp.getUi().alert('Password column is already set up in Column N. No changes made.');
+  } else {
+    // Column N has something unexpected — ask before overwriting
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      '⚠️  Column N already contains: "' + current + '".\n\n' +
+      'The URS_Registry layout expected here is:\n' +
+      'A=URS ID, B=Full Name, C=Department, D=Highest Degree,\n' +
+      'E=Specialization, F=Email, G=Contact, H=Available Days/Hours,\n' +
+      'I=Status, J=AY Appointed, K=Notes, L=Availability,\n' +
+      'M=Availability Reason, N=Password\n\n' +
+      'Do you want to overwrite Column N with "Password"?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response === ui.Button.YES) {
+      sheet.getRange(1, URS_PASSWORD_COL)
+        .setValue('Password')
+        .setFontWeight('bold')
+        .setBackground('#1A3666')
+        .setFontColor('#FFFFFF');
+      SpreadsheetApp.getUi().alert('✅  Password column set in Column N.');
+    } else {
+      SpreadsheetApp.getUi().alert('No changes made. Check your column layout and try again.');
+    }
+  }
+}
+
+// =============================================================================
+// getAllClientsData — Returns ALL client records for the URS Portal All Clients view
+// Called by doGet ?action=getAllClients
+// Returns every client with key fields; excludes sensitive Officer-only financial totals.
+// =============================================================================
+function getAllClientsData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+    if (!sheet) return { success: false, message: 'Clients sheet not found', clients: [] };
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { success: true, clients: [] };
+
+    const C = CONFIG.COL;
+    const clients = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[C.RECORD_ID - 1]) continue; // skip blank rows
+
+      clients.push({
+        rowNum:               i + 1,
+        'Record ID':          row[C.RECORD_ID - 1]    || '',
+        'Date':               row[C.DATE - 1]          ? Utilities.formatDate(new Date(row[C.DATE - 1]), 'Asia/Manila', 'yyyy-MM-dd') : '',
+        'Client Name':        row[C.CLIENT_NAME - 1]  || '',
+        'Email':              row[C.EMAIL - 1]         || '',
+        'Department/School':  row[C.DEPARTMENT - 1]   || '',
+        'Research Title':     row[C.TITLE - 1]        || '',
+        'Research Objectives':row[C.RESEARCH_OBJECTIVES - 1] || '',
+        'Research Questions': row[C.RESEARCH_QUESTIONS - 1]  || '',
+        'Service Type':       row[C.SERVICE - 1]      || '',
+        'Total Fee (P)':      parseFloat(row[C.TOTAL_FEE - 1] || 0),
+        'Payment Status':     row[C.PAY_STATUS - 1]   || '',
+        'Assigned URS':       row[C.ASSIGNED_URS - 1] || '',
+        'URS Share 60% (P)':  parseFloat(row[C.URS_SHARE - 1] || 0),
+        'Status':             row[C.STATUS - 1]       || '',
+        'Remarks':            row[C.REMARKS - 1]      || '',
+        'Drive Folder URL':   row[C.DRIVE_FOLDER - 1] || '',
+        'In Progress Date':   row[C.IN_PROGRESS_DATE - 1] || '',
+        'Deadline Date':      row[C.DEADLINE_DATE - 1]    || '',
+      });
+    }
+
+    return { success: true, clients: clients };
+  } catch (e) {
+    return { success: false, message: e.message, clients: [] };
+  }
+}
+
+// =============================================================================
+// expressInterestFn — URS expresses interest in an unassigned client.
+// Sends a notification email to the ISM Officer with the URS's name and client ID.
+// The Officer reviews and makes the final assignment decision.
+// Called from the URS Portal via POST action=expressInterest.
+// =============================================================================
+function expressInterestFn(recordId, ursName) {
+  try {
+    if (!recordId || !ursName) {
+      return { success: false, message: 'Record ID and URS name are required.' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEET.CLIENTS);
+    if (!sheet) return { success: false, message: 'Clients sheet not found.' };
+
+    const data = sheet.getDataRange().getValues();
+    const C = CONFIG.COL;
+
+    // Find the client record
+    let clientRow = null;
+    for (let i = 1; i < data.length; i++) {
+      if ((data[i][C.RECORD_ID - 1] || '').toString().trim() === recordId.toString().trim()) {
+        clientRow = data[i];
+        break;
+      }
+    }
+
+    if (!clientRow) {
+      return { success: false, message: 'Client record not found: ' + recordId };
+    }
+
+    const clientName   = clientRow[C.CLIENT_NAME - 1] || '';
+    const serviceType  = clientRow[C.SERVICE - 1]     || '';
+    const assignedURS  = (clientRow[C.ASSIGNED_URS - 1] || '').toString().trim();
+
+    // Double-check client is still unassigned
+    if (assignedURS && assignedURS !== '') {
+      return {
+        success: false,
+        message: 'This client has already been assigned to ' + assignedURS + '. Please refresh the list.',
+      };
+    }
+
+    // Build email to Officer
+    const subject = '[ISRM URS Portal] Interest in Client ' + recordId + ' — ' + ursName;
+    const body =
+      'Dear ISRM Officer,\n\n' +
+      'The following URS has expressed interest in taking on a client:\n\n' +
+      '── URS Details ────────────────────────────────────\n' +
+      'URS Name     : ' + ursName + '\n' +
+      '────────────────────────────────────────────────────\n\n' +
+      '── Client Details ──────────────────────────────────\n' +
+      'Record ID    : ' + recordId + '\n' +
+      'Client Name  : ' + clientName + '\n' +
+      'Service Type : ' + serviceType + '\n' +
+      '────────────────────────────────────────────────────\n\n' +
+      'Please review and assign the client to ' + ursName + ' if appropriate.\n\n' +
+      'You can do this by updating the "Assigned URS" column (Column R) for Record ID ' + recordId +
+      ' in the Clients sheet.\n\n' +
+      'ISRM URS Portal — Saint Louis University · Baguio City 2600';
+
+    GmailApp.sendEmail(CONFIG.ISM_OFFICER_EMAIL, subject, body);
+    Logger.log('expressInterestFn: Email sent to Officer for ' + recordId + ' from ' + ursName);
+
     return {
-      success: false,
-      message: 'Client not found: ' + recordId
+      success: true,
+      message: 'Your interest has been submitted. The ISRM Officer will review and assign you to this client.',
     };
   } catch (e) {
+    Logger.log('expressInterestFn error: ' + e.message);
     return { success: false, message: e.message };
   }
 }
