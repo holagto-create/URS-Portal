@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ISRM Digital Operations System — Complete Installation Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lato:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1A3666;--navyD:#0F2245;--navyM:#2A509E;
+    --gold:#C8943A;--goldL:#F0C060;--goldPale:#FDF5E6;
+    --bg:#EDF1F8;--card:#FFFFFF;--text:#1C2340;--muted:#607090;
+    --border:#C4CFDF;--ok:#1A7A3C;--okBg:#E8F5E9;
+    --warn:#9A6200;--warnBg:#FFF3CD;--err:#B01E28;
+    --code-bg:#1E2A3A;--code-c:#E8F0FE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);font-size:13.5px;line-height:1.7;}
+
+  /* ── TOP HEADER ── */
+  .top-hdr{
+    background:linear-gradient(135deg,var(--navyD) 0%,var(--navy) 55%,var(--navyM) 100%);
+    color:#fff;padding:22px 36px;
+    display:flex;align-items:center;gap:18px;
+    box-shadow:0 3px 18px rgba(10,26,60,.36);
+  }
+  .seal{width:52px;height:52px;border-radius:50%;background:var(--gold);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Playfair Display',serif;font-size:17px;font-weight:800;color:var(--navyD);}
+  .top-hdr h1{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;line-height:1.3;}
+  .top-hdr p{font-size:10.5px;opacity:.6;letter-spacing:.1em;text-transform:uppercase;margin-top:3px;}
+
+  /* ── LAYOUT ── */
+  .layout{display:flex;max-width:1180px;margin:0 auto;padding:28px 24px;gap:28px;}
+  .main{flex:1;min-width:0;}
+  .toc{width:248px;flex-shrink:0;}
+
+  /* ── TABLE OF CONTENTS ── */
+  .toc-card{
+    background:var(--card);border:1px solid var(--border);border-radius:8px;
+    padding:0;position:sticky;top:20px;
+    box-shadow:0 3px 12px rgba(0,0,0,.07);overflow:hidden;
+  }
+  .toc-hdr{background:var(--navyD);color:var(--gold);
+    font-family:'Playfair Display',serif;font-size:13px;font-weight:700;
+    padding:11px 16px;letter-spacing:.03em;}
+  .toc-list{list-style:none;padding:8px 0;}
+  .toc-list li a{
+    display:flex;align-items:center;gap:8px;padding:5px 16px;
+    font-size:11.5px;color:var(--muted);text-decoration:none;
+    transition:background .12s,color .12s;
+  }
+  .toc-list li a:hover{background:var(--bg);color:var(--navy);}
+  .toc-list li.phase > a{font-weight:700;color:var(--text);}
+  .toc-list li.sub > a{padding-left:28px;font-size:11px;}
+  .toc-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:50%;
+    background:var(--navy);color:#fff;font-size:9px;font-weight:700;flex-shrink:0;
+  }
+
+  /* ── PHASE SECTIONS ── */
+  .phase-section{margin-bottom:36px;}
+  .phase-hdr{
+    background:linear-gradient(90deg,var(--navyD) 0%,var(--navy) 80%,transparent 100%);
+    border-left:5px solid var(--gold);border-radius:4px 0 0 4px;
+    color:#fff;padding:12px 22px;margin-bottom:20px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .phase-num{
+    font-family:'Playfair Display',serif;font-size:28px;font-weight:700;
+    color:var(--gold);line-height:1;min-width:32px;
+  }
+  .phase-title{font-size:15px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+  .phase-sub{font-size:10.5px;opacity:.65;margin-top:3px;letter-spacing:.08em;}
+
+  /* ── STEP CARDS ── */
+  .step-card{
+    background:var(--card);border:1px solid var(--border);border-radius:7px;
+    margin-bottom:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.055);
+  }
+  .step-hdr{
+    display:flex;align-items:center;gap:14px;
+    background:#F5F8FF;border-bottom:1px solid var(--border);
+    padding:10px 16px;
+  }
+  .step-num{
+    width:28px;height:28px;border-radius:50%;background:var(--navy);
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;flex-shrink:0;
+  }
+  .step-hdr h3{font-size:13.5px;font-weight:700;color:var(--navy);}
+  .step-body{padding:14px 20px;}
+  .step-body p{margin-bottom:8px;font-size:13px;color:var(--text);}
+  .step-body p:last-child{margin-bottom:0;}
+
+  /* ── SUBSTEPS ── */
+  .substep{
+    display:flex;gap:10px;padding:7px 0;
+    border-bottom:1px solid var(--bg);font-size:12.5px;
+  }
+  .substep:last-child{border-bottom:none;}
+  .substep-num{
+    min-width:20px;height:20px;border-radius:50%;background:#E8EFF8;
+    color:var(--navy);display:flex;align-items:center;justify-content:center;
+    font-size:9.5px;font-weight:700;flex-shrink:0;margin-top:2px;
+  }
+  .substep-text{color:var(--text);line-height:1.6;}
+  .substep-text b{color:var(--navy);}
+  .substep-text code{
+    background:var(--bg);border:1px solid var(--border);
+    color:var(--navyD);padding:0 5px;border-radius:3px;
+    font-family:'Courier New',monospace;font-size:11px;
+  }
+
+  /* ── NOTE/WARNING BOXES ── */
+  .note{
+    display:flex;gap:10px;padding:10px 14px;border-radius:5px;
+    font-size:12px;line-height:1.65;margin-top:10px;
+  }
+  .note-icon{font-size:16px;flex-shrink:0;}
+  .note.info{background:#EEF2FA;border-left:4px solid var(--navy);}
+  .note.warn{background:var(--warnBg);border-left:4px solid var(--gold);}
+  .note.ok  {background:var(--okBg); border-left:4px solid var(--ok);}
+  .note.err {background:#FDECEA;     border-left:4px solid var(--err);}
+  .note b{color:var(--text);}
+
+  /* ── CODE BLOCKS ── */
+  .code-block{
+    background:var(--code-bg);border-radius:6px;padding:14px 18px;
+    margin:10px 0;overflow-x:auto;
+    font-family:'Courier New',monospace;font-size:11.5px;color:var(--code-c);
+    line-height:1.65;
+  }
+  .code-block .kw{color:#C792EA;}   /* keywords */
+  .code-block .str{color:#C3E88D;}  /* strings */
+  .code-block .cm{color:#546E7A;}   /* comments */
+  .code-block .fn{color:#82AAFF;}   /* functions */
+  .code-block .num{color:#F78C6C;}  /* numbers */
+
+  .code-label{
+    display:inline-block;background:var(--navyD);color:var(--goldL);
+    font-family:'Courier New',monospace;font-size:10px;font-weight:700;
+    padding:2px 10px;border-radius:4px 4px 0 0;margin-bottom:-1px;
+    letter-spacing:.05em;
+  }
+
+  /* ── INLINE CODE ── */
+  code{
+    background:var(--bg);border:1px solid var(--border);color:var(--navyD);
+    padding:1px 5px;border-radius:3px;font-family:'Courier New',monospace;font-size:11.5px;
+  }
+
+  /* ── TABLES ── */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+  .tbl th{background:var(--navyD);color:#fff;padding:8px 12px;text-align:left;
+    font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;}
+  .tbl td{padding:8px 12px;border-bottom:1px solid var(--bg);}
+  .tbl tr:hover td{background:var(--bg);}
+  .tbl td code{font-size:11px;}
+
+  /* ── CHECKLIST ── */
+  .checklist{list-style:none;padding:0;}
+  .checklist li{display:flex;align-items:flex-start;gap:10px;padding:6px 0;
+    border-bottom:1px solid var(--bg);font-size:12.5px;}
+  .checklist li:last-child{border-bottom:none;}
+  .check-box{width:16px;height:16px;border:2px solid var(--border);border-radius:3px;
+    flex-shrink:0;margin-top:2px;}
+  .check-text b{color:var(--text);}
+  .check-text span{color:var(--muted);font-size:11.5px;}
+
+  /* ── SECTION HEADING ── */
+  .sec-h{
+    font-family:'Playfair Display',serif;font-size:15px;font-weight:700;
+    color:var(--navy);margin:18px 0 10px;border-bottom:2px solid var(--border);
+    padding-bottom:6px;
+  }
+
+  /* ── PRINT ── */
+  @media print{
+    .toc{display:none;}
+    .top-hdr{box-shadow:none;padding:14px 24px;}
+    .layout{padding:14px 18px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ── TOP HEADER ── -->
+<div class="top-hdr">
+  <div class="seal">SLU</div>
+  <div>
+    <h1>ISRM Digital Operations System — Complete Installation &amp; Setup Guide</h1>
+    <p>Research, Innovation, and Sustainable Extension Center · Saint Louis University · Baguio City · 2025</p>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ── TABLE OF CONTENTS ── -->
+  <div class="toc">
+    <div class="toc-card">
+      <div class="toc-hdr">📋 Installation Phases</div>
+      <ul class="toc-list">
+        <li class="phase"><a href="#prereq"><span class="toc-badge">0</span> Prerequisites</a></li>
+        <li class="phase"><a href="#phase1"><span class="toc-badge">1</span> Drive Folder Structure</a></li>
+        <li class="phase"><a href="#phase2"><span class="toc-badge">2</span> Google Sheets Dashboard</a></li>
+        <li class="phase"><a href="#phase3"><span class="toc-badge">3</span> Apps Script Installation</a></li>
+        <li class="phase"><a href="#phase4"><span class="toc-badge">4</span> Google Forms Setup</a></li>
+        <li class="sub"><a href="#form002">↳ FM-RIS-002 (Intake Form)</a></li>
+        <li class="sub"><a href="#form003">↳ FM-RIS-003 (Satisfaction Survey)</a></li>
+        <li class="phase"><a href="#phase5"><span class="toc-badge">5</span> Google Doc Templates</a></li>
+        <li class="sub"><a href="#doc059">↳ FM-RIS-059 (Semestral Report)</a></li>
+        <li class="sub"><a href="#doc060">↳ FM-RIS-060 (Honoraria Req.)</a></li>
+        <li class="phase"><a href="#phase6"><span class="toc-badge">6</span> Connect Everything</a></li>
+        <li class="phase"><a href="#phase7"><span class="toc-badge">7</span> Google Sites Portal</a></li>
+        <li class="phase"><a href="#phase8"><span class="toc-badge">8</span> Testing</a></li>
+        <li class="phase"><a href="#phase9"><span class="toc-badge">9</span> Go-Live Checklist</a></li>
+        <li class="phase"><a href="#maint"><span class="toc-badge">✦</span> Maintenance</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="main">
+
+    <!-- ── OVERVIEW ── -->
+    <div class="phase-section">
+      <div class="note info" style="margin-bottom:18px;">
+        <div class="note-icon">📖</div>
+        <div>
+          <b>What this guide covers:</b> Complete step-by-step instructions to build the
+          ISRM Digital Operations System from scratch using free Google Workspace tools —
+          Google Sheets (dashboard), Apps Script (automation), Google Forms (digital FM-RIS-002
+          and FM-RIS-003), Google Docs (FM-RIS-059 and FM-RIS-060 templates), and Google Sites
+          (ISRM Web Portal). Estimated setup time: <b>3–4 hours</b> for full deployment.
+        </div>
+      </div>
+
+      <div class="note warn">
+        <div class="note-icon">⚠️</div>
+        <div>
+          <b>Form Code Update:</b> These instructions use the official Revision 01 form codes
+          effective 30 September 2025: <b>FM-RIS-002, FM-RIS-003, FM-RIS-059, FM-RIS-060</b>.
+          The center name is <b>Research, Innovation, and Sustainable Extension Center (RISE Center)</b>.
+          The officer is the <b>ISM Officer</b> and reports to the <b>RISE Center Director</b>.
+          FM-RIS-060 is addressed to the <b>Finance Office</b> (not Accounting Office).
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 0: PREREQUISITES
+         ═══════════════════════════════════════════ -->
+    <div id="prereq" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">0</div>
+        <div>
+          <div class="phase-title">Prerequisites</div>
+          <div class="phase-sub">What you need before starting</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr">
+          <div class="step-num">A</div>
+          <h3>Required Accounts and Access</h3>
+        </div>
+        <div class="step-body">
+          <table class="tbl">
+            <thead><tr><th>Requirement</th><th>Details</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><b>SLU Google Workspace Account</b></td>
+                <td>Your <code>@slu.edu.ph</code> Google account — must be signed in</td>
+                <td>✅ Required</td></tr>
+              <tr><td><b>Google Chrome Browser</b></td>
+                <td>Recommended; Edge and Firefox also work</td>
+                <td>✅ Required</td></tr>
+              <tr>              <td><b>The Apps Script file</b></td>
+                <td>The <code>isrm_apps_script_v3.js</code> file from this project</td>
+                <td>✅ Required</td></tr>
+              <tr>              <td><b>The form templates HTML</b></td>
+                <td><code>isrm_form_templates_v3.html</code> — open in browser as reference</td>
+                <td>✅ Required</td></tr>
+              <tr><td><b>Admin access to Google Drive</b></td>
+                <td>Ability to create files and folders in your Drive</td>
+                <td>✅ Required</td></tr>
+              <tr><td><b>3–4 hours uninterrupted</b></td>
+                <td>Initial setup; subsequent use is minutes per semester</td>
+                <td>📅 Plan ahead</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 1: DRIVE FOLDER STRUCTURE
+         ═══════════════════════════════════════════ -->
+    <div id="phase1" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">1</div>
+        <div>
+          <div class="phase-title">Google Drive Folder Structure</div>
+          <div class="phase-sub">Create the organized folder hierarchy first — everything else goes inside</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Create the Root Folder</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to <b>drive.google.com</b> and sign in with your <code>@slu.edu.ph</code> account.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Click <b>New → Folder</b>. Name it exactly:
+              <code>ISRM — Statistical Services Digital System</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Open this folder. <b>Copy its URL</b> — you will need the Folder ID
+              (the string after <code>/folders/</code> in the URL) later.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Create Subfolders Inside the Root Folder</h3></div>
+        <div class="step-body">
+          <p>Inside <code>ISRM — Statistical Services Digital System</code>, create these 4 subfolders:</p>
+          <table class="tbl" style="margin-top:8px;">
+            <thead><tr><th>Subfolder Name</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>ISRM Generated Reports</code></td>
+                <td>All auto-generated PDFs (FM-RIS-059 and FM-RIS-060) are saved here by the Apps Script</td></tr>
+              <tr><td><code>Form Templates</code></td>
+                <td>Houses the FM-RIS-059 and FM-RIS-060 Google Doc template files</td></tr>
+              <tr><td><code>Client Records Archive</code></td>
+                <td>Manual archive of physical forms (optional; for hybrid paper-digital workflow)</td></tr>
+              <tr><td><code>URS Registry</code></td>
+                <td>URS-related files, certificates, and appointment documents</td></tr>
+            </tbody>
+          </table>
+          <div class="note info" style="margin-top:10px;">
+            <div class="note-icon">📋</div>
+            <div><b>Get the Folder ID of "ISRM Generated Reports":</b> Open that subfolder, look at the URL bar.
+              The ID is everything after <code>/folders/</code>. Example:<br>
+              URL: <code>https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnO123</code><br>
+              Folder ID: <code>1AbCdEfGhIjKlMnO123</code><br>
+              <b>Save this ID — you will paste it into the Apps Script CONFIG as
+              <code>OUTPUT_FOLDER_ID</code>.</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 2: GOOGLE SHEETS DASHBOARD
+         ═══════════════════════════════════════════ -->
+    <div id="phase2" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">2</div>
+        <div>
+          <div class="phase-title">Google Sheets Dashboard</div>
+          <div class="phase-sub">Create the Officer's Command Center spreadsheet</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Create a New Google Spreadsheet</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to <b>sheets.google.com</b> → click <b>+ Blank</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Rename the sheet:
+              <code>ISRM Statistical Services Dashboard — RISE Center</code><br>
+              (Click on "Untitled spreadsheet" at the top left.)</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text"><b>Move this file</b> into your
+              <code>ISRM — Statistical Services Digital System</code> Drive folder:
+              File → Move → navigate to the folder.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Leave this spreadsheet open — you will install the Apps Script into it next.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note info">
+        <div class="note-icon">⚡</div>
+        <div>
+          <b>The Apps Script (Phase 3) will build the sheet structure automatically.</b>
+          You do NOT need to manually create the column headers — the
+          <code>setupDashboard()</code> function does this in one click. Just create the
+          blank spreadsheet here; the structure is built in Phase 3.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 3: APPS SCRIPT INSTALLATION
+         ═══════════════════════════════════════════ -->
+    <div id="phase3" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">3</div>
+        <div>
+          <div class="phase-title">Apps Script Installation</div>
+          <div class="phase-sub">The automation engine — install inside the Google Sheets dashboard</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Open the Apps Script Editor</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In your Google Sheets dashboard, click the menu:
+              <b>Extensions → Apps Script</b></div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">A new browser tab opens — the Apps Script editor.
+              Rename the project from "Untitled project" to:
+              <code>ISRM Operations Suite v2.0</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">You will see one file in the left panel: <b>Code.gs</b>.
+              Click on it — it will show some default code.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Paste the Script Code</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text"><b>Select all existing code</b> in Code.gs
+              (Ctrl+A / Cmd+A) and <b>delete it</b>.</div>
+          </div>
+            <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Open the file <code>isrm_apps_script_v3.js</code>
+              in any text editor. Select all (Ctrl+A), copy (Ctrl+C).</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Back in the Apps Script editor, <b>paste</b> (Ctrl+V)
+              the entire script into Code.gs.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Click <b>Save</b> (Ctrl+S or the floppy disk icon).
+              The editor should show no syntax errors (no red underlines).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">3</div><h3>Update the CONFIG Object</h3></div>
+        <div class="step-body">
+          <p>At the top of Code.gs, find the <code>CONFIG</code> object. Update these values:</p>
+          <table class="tbl" style="margin-top:8px;">
+            <thead><tr><th>CONFIG Key</th><th>What to Enter</th><th>Where to Get It</th></tr></thead>
+            <tbody>
+              <tr><td><code>FM_RIS_059_TEMPLATE_ID</code></td>
+                <td>Google Doc ID of your FM-RIS-059 template</td>
+                <td>Phase 5, Step 1</td></tr>
+              <tr><td><code>FM_RIS_060_TEMPLATE_ID</code></td>
+                <td>Google Doc ID of your FM-RIS-060 template</td>
+                <td>Phase 5, Step 2</td></tr>
+              <tr><td><code>OUTPUT_FOLDER_ID</code></td>
+                <td>Folder ID of "ISRM Generated Reports"</td>
+                <td>Phase 1, Step 2</td></tr>
+              <tr><td><code>ISM_OFFICER_EMAIL</code></td>
+                <td>Your SLU email address (e.g., <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a2cac5c3d6cde2d1ced78cc7c6d78cd2ca">[email&#160;protected]</a></code>)</td>
+                <td>Your own email</td></tr>
+              <tr><td><code>RISE_CENTER_DIRECTOR_EMAIL</code></td>
+                <td>RISE Center Director's email</td>
+                <td>RISE Center office</td></tr>
+            </tbody>
+          </table>
+          <div class="note warn" style="margin-top:10px;">
+            <div class="note-icon">⚠️</div>
+            <div><b>Do Phases 4 and 5 first</b> to get the Google Form URL, Doc template IDs, and
+              Folder ID before you can complete the CONFIG. You can come back to this step.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">4</div><h3>Run setupDashboard() — Build the Sheet Structure</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In the Apps Script editor, click the function dropdown
+              (top toolbar, shows "Select function") and choose <code>setupDashboard</code>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Click the <b>▶ Run</b> button.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text"><b>First-time authorization:</b> Google will ask for permissions.
+              Click <b>Review permissions → Choose your SLU account → Advanced → Go to ISRM Operations Suite
+              (unsafe) → Allow</b>.<br>
+              <em>This is safe — it's your own script on your own account.</em></div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Switch back to the Google Sheets tab.
+              You will see three sheets created at the bottom:
+              <code>Clients</code>, <code>URS_Registry</code>, <code>Financial_Summary</code> —
+              all with navy-blue headers and data validation.</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text">An alert dialog will confirm: <em>"✅ ISRM Dashboard Initialized Successfully!"</em>
+              Click <b>OK</b>.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">5</div><h3>Add the Custom Menu to Google Sheets</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Back in the Apps Script editor, run the function <code>onOpen</code>
+              (select from dropdown → Run).</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Switch to the Sheets tab and <b>reload the page</b> (F5 or Ctrl+R).
+              After reloading, you will see a new menu item <b>"🎯 ISRM Operations"</b>
+              in the Google Sheets menu bar.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">The menu contains:
+              <b>Generate Reports</b> (FM-RIS-059 Semestral Report and FM-RIS-060 Honoraria Requisition),
+              Send Satisfaction Survey Link, Financial Summary Quick View, Initialize Dashboard,
+              and Setup Form Submit Trigger.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 4: GOOGLE FORMS SETUP
+         ═══════════════════════════════════════════ -->
+    <div id="phase4" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">4</div>
+        <div>
+          <div class="phase-title">Google Forms Setup</div>
+          <div class="phase-sub">Digital FM-RIS-002 (Client Intake) and FM-RIS-003 (Satisfaction Survey)</div>
+        </div>
+      </div>
+
+      <!-- FM-RIS-002 -->
+      <div id="form002" class="sec-h">FM-RIS-002 — Statistical Services Request Form (Digital Intake)</div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Create the Google Form</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to <b>forms.google.com</b> → click <b>+ Blank</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Name the form:
+              <code>ISRM Statistical Services Request Form (FM-RIS-002)</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Add this description:<br>
+              <em>"Please complete this form to initiate a statistical services request with the ISRM Unit,
+              Research, Innovation, and Sustainable Extension Center (RISE Center),
+              Saint Louis University."</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Add Form Fields — EXACT LABELS REQUIRED</h3></div>
+        <div class="step-body">
+          <p>The Apps Script's <code>onFormSubmit()</code> uses <code>e.namedValues["Label"]</code>
+            to pull responses. The field labels in your Google Form <b>must exactly match</b>
+            the labels in the table below.</p>
+          <div class="note warn" style="margin-bottom:10px;">
+            <div class="note-icon">🔄</div>
+            <div>
+              <b>v3 Change — aligned with the original FM-RIS-002 paper form:</b><br>
+              ✅ <b>Item 1 "Date" ADDED</b> — present at the top-right of the original FM-RIS-002 paper form.
+              The Apps Script captures <code>get('Date')</code> and stores it as the official request date
+              (falls back to submission timestamp if blank).<br>
+              ❌ <b>Old Item 10 "Affiliation" REMOVED</b> — not present in the original FM-RIS-002.
+              Affiliation (SLU / Non-SLU) is determined by the <b>ISM Officer</b> after reviewing the
+              client's School field, then manually entered in the <b>Affiliation column (Col K)</b>
+              of the Google Sheets dashboard. If Non-SLU, the ISM Officer also adjusts Total Fee (Col N)
+              — the 60/40 split auto-recalculates via the <code>onEdit()</code> trigger.
+            </div>
+          </div>
+          <table class="tbl" style="margin-top:4px;">
+            <thead><tr><th>#</th><th>Field Label (exact)</th><th>Question Type</th><th>Required?</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr style="background:#FFF9F0;">
+                <td><b>1</b></td>
+                <td><code>Date</code></td>
+                <td>Date picker</td>
+                <td>No (optional)</td>
+                <td>✅ <b>NEW.</b> Matches "Date: ___" field on original FM-RIS-002 (top right). Script falls back to submission timestamp if blank.</td>
+              </tr>
+              <tr><td>2</td><td><code>Client Name</code></td><td>Short answer</td><td>✅ Yes</td><td>—</td></tr>
+              <tr><td>3</td><td><code>Student/Employee ID</code></td><td>Short answer</td><td>✅ Yes</td><td>—</td></tr>
+              <tr><td>4</td><td><code>Contact Number</code></td><td>Short answer</td><td>✅ Yes</td><td>—</td></tr>
+              <tr><td>5</td><td><code>Email Address</code></td><td>Short answer — enable email validation</td><td>✅ Yes</td><td>Used for automated acknowledgment email</td></tr>
+              <tr><td>6</td><td><code>Course/Department</code></td><td>Short answer</td><td>✅ Yes</td><td>—</td></tr>
+              <tr><td>7</td><td><code>School</code></td>
+                <td>Dropdown — list all SLU schools + "Others / Non-SLU"</td><td>✅ Yes</td>
+                <td>ISM Officer uses this to determine Affiliation (SLU or Non-SLU) in the dashboard</td></tr>
+              <tr><td>8</td><td><code>Research/Innovation Project Title</code></td>
+                <td>Paragraph (long answer)</td><td>✅ Yes</td><td>—</td></tr>
+              <tr><td>9</td><td><code>Funding Source</code></td>
+                <td>Short answer</td><td>No (optional)</td><td>—</td></tr>
+              <tr><td>10</td><td><code>Research Category</code></td>
+                <td>Multiple choice: Undergraduate / Graduate / Staff</td><td>✅ Yes</td>
+                <td>Used in fee calculation (SLU base rate)</td></tr>
+              <tr style="background:#FFF0F0;">
+                <td><s>~~</s></td>
+                <td><s><code>Affiliation</code></s></td>
+                <td><s>Multiple choice: SLU / Non-SLU</s></td>
+                <td>❌ <b>REMOVED</b></td>
+                <td>Not on original FM-RIS-002. ISM Officer sets Col K manually in dashboard.</td>
+              </tr>
+              <tr><td>11</td><td><code>Service Type</code></td>
+                <td>Multiple choice: Consultation / Full Statistical Assistance /
+                  Reliability/Validity of Research Instrument / Mentoring Services / Others</td>
+                <td>✅ Yes</td><td>—</td></tr>
+              <tr><td>12</td><td><code>No. of Hours</code></td>
+                <td>Short answer (number)</td>
+                <td>No (optional)</td>
+                <td>For Consultation only. Use Section logic to show conditionally. Script defaults to 1 hr if blank.</td></tr>
+            </tbody>
+          </table>
+          <div class="note info" style="margin-top:10px;">
+            <div class="note-icon">💡</div>
+            <div><b>Total active Google Form fields: 12</b> (11 data fields + 1 conditional).<br>
+              For Question 12 (<code>No. of Hours</code>), use <b>Section logic</b> in Google Forms:
+              after the Service Type question, add a section that appears only when "Consultation"
+              is selected. This is optional; the script defaults to 1 hour if the field is blank.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">3</div><h3>Link the Form to the Dashboard Spreadsheet</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In the Google Form, click the <b>Responses</b> tab at the top.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Click the <b>green Sheets icon</b> (or "Link to Sheets" button).
+              A dialog appears.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Choose <b>"Select existing spreadsheet"</b> → navigate to
+              <code>ISRM Statistical Services Dashboard — RISE Center</code> → click <b>Select</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Google Forms will create a new sheet tab called
+              <code>Form Responses 1</code> in your dashboard spreadsheet.
+              This is the raw responses tab — the Apps Script appends processed data to
+              the <code>Clients</code> tab.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">4</div><h3>Run setupFormTrigger() in Apps Script</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In the Google Sheets dashboard, go to
+              <b>🎯 ISRM Operations → Setup Form Submit Trigger (FM-RIS-002)</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">A confirmation dialog appears: <em>"✅ Form Submit Trigger Created!"</em>
+              This means every new form submission will now fire <code>onFormSubmit()</code> automatically.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">To verify: Go to Apps Script editor →
+              <b>Triggers</b> (clock icon on left sidebar) → you should see one trigger listed:
+              <code>onFormSubmit — From spreadsheet — On form submit</code>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FM-RIS-003 -->
+      <div id="form003" class="sec-h" style="margin-top:22px;">FM-RIS-003 — Customer Satisfaction Survey Form</div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">5</div><h3>Create the Satisfaction Survey Google Form</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Create a new Google Form named:
+              <code>ISRM Statistical Services Customer Satisfaction Survey (FM-RIS-003)</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Add Question 1: <b>Research/Innovation Project Title</b> — Short answer (Required).</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Add Question 2: <b>Date of Availing of Statistical Service</b> — Date field (Required).</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Add Question 3: <b>Rating (per FM-RIS-003 Rev.01)</b> — Use
+              <b>Checkbox Grid</b> question type.<br>
+              Rows: Timeliness | Completeness | Appropriateness of statistical method/s used |
+              Vivid/clear explanation | Courtesy of statistician/consultant |
+              Overall quality of the service<br>
+              Columns: 4 | 3 | 2 | 1 | N/A<br>
+              Enable "Limit to one response per column" = OFF (allow multiple ratings per column).</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text">Add Question 4: <b>Any suggestions for possible improvement of our Statistical Services?</b>
+              — Paragraph (optional).</div>
+          </div>
+          <div class="substep"><div class="substep-num">f</div>
+            <div class="substep-text">Edit the confirmation message to:
+              <em>"We value what you think. Thank you for your inputs! — ISRM Unit, RISE Center, SLU"</em></div>
+          </div>
+          <div class="substep"><div class="substep-num">g</div>
+            <div class="substep-text">Link this form to a new sheet tab in the dashboard spreadsheet
+              (Responses → Link to Sheets → Select existing → your dashboard). Name the tab
+              <code>FM-RIS-003 Responses</code>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">h</div>
+            <div class="substep-text"><b>Copy the form's shareable link</b>:
+              Send → Copy link icon. Paste this URL into the Apps Script CONFIG as the
+              <code>SURVEY_URL</code> constant in the <code>sendSatisfactionSurveyEmail()</code> function.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 5: GOOGLE DOC TEMPLATES
+         ═══════════════════════════════════════════ -->
+    <div id="phase5" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">5</div>
+        <div>
+          <div class="phase-title">Google Doc Templates</div>
+          <div class="phase-sub">FM-RIS-059 (Semestral Report) and FM-RIS-060 (Honoraria Requisition)</div>
+        </div>
+      </div>
+
+      <div class="note warn">
+        <div class="note-icon">📌</div>
+           <div>
+          <b>Use the Form Templates HTML as your visual reference.</b> Open
+          <code>isrm_form_templates_v3.html</code> in your browser alongside the Google Doc.
+          The HTML shows exactly where each <span style="color:var(--ph-color);font-family:monospace;">{{PLACEHOLDER}}</span>
+          tag goes. All orange dashed elements in the HTML = placeholders you must insert in the Doc.
+        </div>
+      </div>
+
+      <!-- FM-RIS-059 -->
+      <div id="doc059" class="sec-h">FM-RIS-059 — Statistical Services Semestral Report</div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Create the FM-RIS-059 Google Doc Template</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to <b>docs.google.com</b> → create a new blank document.
+              Name it: <code>[TEMPLATE] FM-RIS-059 Semestral Report</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Move it to the <code>Form Templates</code> subfolder in your Drive.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text"><b>Build the letterhead</b> (3-column layout using a table with no borders):<br>
+              Left: SLU seal/logo image (insert from Drive or URL)<br>
+              Center: "Saint Louis University" (bold, 14pt) | "Research, Innovation, and Sustainable Extension Center" (12pt) | "STATISTICAL SERVICES SEMESTRAL REPORT" (bold, 13pt, uppercase)<br>
+              Right: A 4-row table (Document Code: FM-RIS-059 | Revision No.: 01 | Effectivity: 30 Sept 2025 | Page: 1 of 1) with border. Add "CONTROLLED" above it in bold.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text"><b>Add a horizontal line</b> below the letterhead (Insert → Horizontal line).</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text">Below the line, type:<br>
+              <code>Semester, AY: {{SEMESTER_AY}}</code> &ensp; <code>Date: {{DATE}}</code><br>
+              These two placeholders will be replaced by the Apps Script.</div>
+          </div>
+          <div class="substep"><div class="substep-num">f</div>
+            <div class="substep-text"><b>Insert a 5-column table</b> (Insert → Table → 5×2).<br>
+              Row 1 (Header — shade navy blue, white text):
+              Date | Client | Services availed / Fees | URS | Remarks<br>
+              Row 2: Leave blank — this is the sample data row the script will replace.
+              You only need ONE data row; the script clears it and appends as many rows as needed.</div>
+          </div>
+          <div class="substep"><div class="substep-num">g</div>
+            <div class="substep-text">Below the table, add the totals line:<br>
+              <code>Gross Fees Collected: {{TOTAL_FEES}} &emsp; URS Honoraria (60%): {{URS_SHARE}} &emsp; Unit Share (40%): {{UNIT_SHARE}}</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">h</div>
+            <div class="substep-text">Add signature block with two columns:<br>
+              Left: "Prepared by:" — signature line — "ISM Officer"<br>
+              Right: "Noted by:" — signature line — "RISE Center Director"</div>
+          </div>
+          <div class="substep"><div class="substep-num">i</div>
+            <div class="substep-text"><b>Get the Document ID:</b> Look at the URL.
+              The ID is the long string between <code>/d/</code> and <code>/edit</code>.<br>
+              Example: <code>https://docs.google.com/document/d/<b>1BxCyZaBcDeFgHiJk</b>/edit</code><br>
+              Paste this ID into Apps Script <code>CONFIG.FM_RIS_059_TEMPLATE_ID</code>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FM-RIS-060 -->
+      <div id="doc060" class="sec-h" style="margin-top:22px;">FM-RIS-060 — Requisition for Honoraria of URS</div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Create the FM-RIS-060 Google Doc Template</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Create a new Doc named:
+              <code>[TEMPLATE] FM-RIS-060 Honoraria Requisition</code>
+              and move to <code>Form Templates</code> subfolder.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Build the same letterhead format as FM-RIS-059 but with document code
+              <code>FM-RIS-060</code> and title "STATISTICAL SERVICES / REQUISITION FOR HONORARIA OF
+              UNIVERSITY RESEARCH STATISTICIANS".</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">After the letterhead, add:<br>
+              <code>Date: {{DATE}}</code><br><br>
+              <b>To the Finance Office:</b><br><br>
+              May I request for the payment of the honoraria of the following University Research
+              Statisticians (URS) for the month of <code>{{PERIOD}}</code>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text"><b>Insert a 5-column table</b> for the honoraria data:<br>
+              Header row (navy bg): blank | Name | Client's Name | Type of services availed / Fee | Amount due<br>
+              Add one sample data row below (the script replaces it).</div>
+          </div>
+          <div class="substep"><div class="substep-num">f</div>
+            <div class="substep-text">Below the table, add:
+              <code>GRAND TOTAL HONORARIA: {{GRAND_TOTAL}}</code><br>
+              (Format this prominently — bold, larger text.)</div>
+          </div>
+          <div class="substep"><div class="substep-num">g</div>
+            <div class="substep-text">Add attestation paragraph:<br>
+              <em>"I attest that the above-listed University Research Statisticians have rendered their
+              services satisfactorily. Thank you very much."</em></div>
+          </div>
+          <div class="substep"><div class="substep-num">h</div>
+            <div class="substep-text">Add signature block — THREE areas:<br>
+              Left: "Prepared by:" → ISM Officer<br>
+              Right: "Noted by:" → RISE Center Director<br>
+              Center (below): "Approved for release:" → Vice President for Finance</div>
+          </div>
+          <div class="substep"><div class="substep-num">i</div>
+            <div class="substep-text">Get the Document ID from the URL and paste into
+              <code>CONFIG.FM_RIS_060_TEMPLATE_ID</code> in the Apps Script.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note ok">
+        <div class="note-icon">✅</div>
+        <div>
+          <b>After completing Phase 5:</b> Go back to Phase 3 Step 3 and fill in all remaining
+          CONFIG values (template Doc IDs, output folder ID, email addresses). Then save and
+          run <code>setupDashboard()</code> again to confirm everything is set correctly.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 6: CONNECT EVERYTHING
+         ═══════════════════════════════════════════ -->
+    <div id="phase6" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">6</div>
+        <div>
+          <div class="phase-title">Connect All Components</div>
+          <div class="phase-sub">Wire the system together and verify the complete CONFIG object</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Final CONFIG Verification Checklist</h3></div>
+        <div class="step-body">
+          <p>Open the Apps Script editor and verify every CONFIG value is filled:</p>
+          <ul class="checklist" style="margin-top:8px;">
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM_RIS_059_TEMPLATE_ID</b> — <span>14–50 character Doc ID, not the URL</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM_RIS_060_TEMPLATE_ID</b> — <span>14–50 character Doc ID, not the URL</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>OUTPUT_FOLDER_ID</b> — <span>Folder ID of "ISRM Generated Reports"</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>ISM_OFFICER_EMAIL</b> — <span>Your actual SLU email address</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>RISE_CENTER_DIRECTOR_EMAIL</b> — <span>Director's actual email</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>SURVEY_URL</b> in <code>sendSatisfactionSurveyEmail()</code> — <span>FM-RIS-003 Google Form shareable link</span>
+            </div></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Grant Permissions to Both Template Docs</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Open each Google Doc template → Click <b>Share</b> → Change from
+              "Restricted" to <b>"Anyone with the link — Viewer"</b> access.<br>
+              The Apps Script (running as you) needs read access to copy these files.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Also ensure your Google Account has <b>Editor access</b> to the
+              "ISRM Generated Reports" Drive folder — you created it, so you should already have it.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">3</div><h3>Add the URS Registry Data</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to the <code>URS_Registry</code> tab in the dashboard spreadsheet.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Add a row for each University Research Statistician:
+              URS ID (e.g., URS-001), Full Name, Department, Highest Degree, Specialization,
+              Email, Contact No., Available Days/Hours, Status (Active), AY Appointed, Notes.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">The names in this registry are what you select in the
+              <b>"Assigned URS"</b> column of the Clients sheet. Consistency of spelling matters.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 7: GOOGLE SITES PORTAL
+         ═══════════════════════════════════════════ -->
+    <div id="phase7" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">7</div>
+        <div>
+          <div class="phase-title">ISRM Web Portal (Google Sites)</div>
+          <div class="phase-sub">The public-facing gateway for client intake and knowledge resources</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>Create the Google Site</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Go to <b>sites.google.com</b> → click <b>+ New site</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Site name: <code>ISRM Statistical Services — RISE Center, SLU</code></div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Set the site URL slug: <code>isrm-rss</code> or <code>isrm-rise-slu</code>
+              (the full URL will be <code>sites.google.com/slu.edu.ph/isrm-rss</code>
+              if using Google Workspace for Education).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Create All 6 Pages</h3></div>
+        <div class="step-body">
+          <p>In Google Sites, click <b>Pages</b> panel (right sidebar) → Add page for each:</p>
+          <table class="tbl" style="margin-top:8px;">
+            <thead><tr><th>Page Name</th><th>Key Content</th><th>Embed?</th></tr></thead>
+            <tbody>
+              <tr><td><b>Home</b></td>
+                <td>Unit overview, mission, "Request a Service" CTA button, fee summary table, announcements</td>
+                <td>—</td></tr>
+              <tr><td><b>Services</b></td>
+                <td>Consultation, Full Statistical Assistance, Reliability/Validity, Mentoring, Trainings/Workshops — with fees per category</td>
+                <td>FM-RIS-002 Google Form</td></tr>
+              <tr><td><b>Knowledge Base</b></td>
+                <td>Statistical test selection guide, sample size guide, instrument validation (Aiken's V), reliability (Cronbach's α), data file setup</td>
+                <td>—</td></tr>
+              <tr><td><b>Self-Service Tools</b></td>
+                <td>Sample size calculator, Aiken's V calculator, statistical decision wizard, FAQs</td>
+                <td>HTML tools via embed</td></tr>
+              <tr><td><b>Resources</b></td>
+                <td>FM-RIS-002 PDF (printable), FM-RIS-003 PDF, statistical reference tables, ISRM MOPG document</td>
+                <td>PDF downloads from Drive</td></tr>
+              <tr><td><b>Contact</b></td>
+                <td>Office location, hours, contact info, satisfaction survey link</td>
+                <td>FM-RIS-003 Google Form</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">3</div><h3>Embed the FM-RIS-002 Google Form on "Services" Page</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Open the <b>Services</b> page in edit mode.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Click the <b>Insert</b> panel (right sidebar) → scroll down to
+              <b>Google Forms</b> → click it.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Select your <code>ISRM Statistical Services Request Form (FM-RIS-002)</code>
+              from the list → click <b>Insert</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Resize the form embed to cover the full page width.
+              Add a heading above it: "Submit Your Service Request (FM-RIS-002)".</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">4</div><h3>Apply SLU Branding</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In Google Sites editor, click <b>Themes</b> (right sidebar) →
+              choose <b>Simple</b> or <b>Impression</b> as the base theme.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Set primary color to <b>#1A3666</b> (SLU Navy)
+              and accent to <b>#C8943A</b> (SLU Gold).</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Upload the SLU logo as the site logo:
+              Settings (gear icon) → Brand images → upload SLU seal PNG.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Set the site header banner to an appropriate image
+              (SLU campus photo or a solid navy banner with white text).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">5</div><h3>Publish the Site</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Click the <b>Publish</b> button (top right) in Google Sites.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Set visibility to <b>"Anyone at Saint Louis University"</b>
+              (for internal use only) or <b>"Anyone with the link"</b>
+              (for external clients like Non-SLU researchers).</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Copy the published URL and share it:
+              in your email signature, on the SLU website, and in the MOPG document.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 8: TESTING
+         ═══════════════════════════════════════════ -->
+    <div id="phase8" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">8</div>
+        <div>
+          <div class="phase-title">Testing and Validation</div>
+          <div class="phase-sub">Test all system components before going live with real clients</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">1</div><h3>End-to-End Test: Full Client Journey</h3></div>
+        <div class="step-body">
+          <p>Submit a test entry using your own email address and a fake research title.</p>
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text"><b>Visit the Google Sites portal</b> → Services page →
+              fill out and submit the embedded FM-RIS-002 form with test data.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text"><b>Check your email</b> (ISM Officer email):
+              you should receive the "New Request" alert within 1–2 minutes.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text"><b>Check the "test client" email</b>:
+              should receive the acknowledgment email with Record ID, fee, and next steps.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text"><b>Open the Clients sheet</b> in the dashboard:
+              verify the new row was appended with Record ID (ISRM-YYYY-NNNN), all fields populated,
+              fee computed, and URS Share / Unit Share columns auto-filled at 60%/40%.</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text"><b>Test onEdit():</b> Manually type a new fee amount in the
+              Total Fee column of the test row — verify URS Share and Unit Share columns
+              update automatically within 1 second.</div>
+          </div>
+          <div class="substep"><div class="substep-num">f</div>
+            <div class="substep-text"><b>Enter an OR Number</b> in the test row's OR Number column.
+              Change Payment Status to "Paid." The row should turn green (conditional formatting).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">2</div><h3>Test FM-RIS-059 Generation</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">In Google Sheets, go to
+              <b>🎯 ISRM Operations → Generate Reports → FM-RIS-059 – Semestral Report</b>.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Type <code>Second Semester, AY 2024-2025</code> in the prompt → click OK.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text"><b>Expected result:</b> A success dialog showing record count, fees, and a
+              Google Drive URL for the generated PDF.</div>
+          </div>
+          <div class="substep"><div class="substep-num">d</div>
+            <div class="substep-text">Click the Drive URL (or open "ISRM Generated Reports" folder) →
+              verify the PDF exists, opens correctly, and shows the correct letterhead
+              (RISE Center, not UnRIC), the correct form code (FM-RIS-059), correct semester/AY,
+              and all client rows populated.</div>
+          </div>
+          <div class="substep"><div class="substep-num">e</div>
+            <div class="substep-text">Verify the signature block shows: <b>ISM Officer</b> (Prepared by) and
+              <b>RISE Center Director</b> (Noted by).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">3</div><h3>Test FM-RIS-060 Generation</h3></div>
+        <div class="step-body">
+          <div class="substep"><div class="substep-num">a</div>
+            <div class="substep-text">Make sure at least one Clients row has:
+              Payment Status = "Paid", Assigned URS = filled, URS Share = computed.</div>
+          </div>
+          <div class="substep"><div class="substep-num">b</div>
+            <div class="substep-text">Go to <b>🎯 ISRM Operations → Generate Reports → FM-RIS-060 – Honoraria Requisition</b>
+              → type <code>Second Semester AY 2024-2025</code> → OK.</div>
+          </div>
+          <div class="substep"><div class="substep-num">c</div>
+            <div class="substep-text">Open the generated PDF and verify:
+              "To the Finance Office:" (not Accounting), per-URS breakdown, 60% amounts,
+              grand total, correct signature block (ISM Officer / RISE Center Director /
+              Vice President for Finance).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">4</div><h3>Common Issues and Fixes</h3></div>
+        <div class="step-body">
+          <table class="tbl">
+            <thead><tr><th>Issue</th><th>Cause</th><th>Fix</th></tr></thead>
+            <tbody>
+              <tr><td>Form submit doesn't fire onFormSubmit</td>
+                <td>Trigger not set</td>
+                <td>Re-run <code>setupFormTrigger()</code> from the ISRM Operations menu</td></tr>
+              <tr><td>PDF shows "PASTE_YOUR_..._HERE" in title</td>
+                <td>Template Doc ID not updated in CONFIG</td>
+                <td>Update CONFIG, save script, re-run generation</td></tr>
+              <tr><td>Email not received</td>
+                <td>Wrong email in CONFIG, or Gmail quota hit</td>
+                <td>Check CONFIG email fields; test with your own email first</td></tr>
+              <tr><td>"No table found in template Doc" error</td>
+                <td>Template Doc has no table, or table is the second table</td>
+                <td>Ensure FM-RIS-059/060 template Doc has a table as the very first object after the letterhead; remove any above-table elements that might be tables</td></tr>
+              <tr><td>60/40 doesn't auto-calculate</td>
+                <td>onEdit is a simple trigger — only fires on direct edits, not programmatic</td>
+                <td>Works correctly for manual edits. For script-appended rows, values are pre-computed in <code>onFormSubmit()</code></td></tr>
+              <tr><td>Authorization error</td>
+                <td>Script needs new permissions after code update</td>
+                <td>In Apps Script: Run any function → re-authorize when prompted</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PHASE 9: GO-LIVE CHECKLIST
+         ═══════════════════════════════════════════ -->
+    <div id="phase9" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">9</div>
+        <div>
+          <div class="phase-title">Go-Live Checklist</div>
+          <div class="phase-sub">Confirm every component before announcing the system to clients</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">✅</div><h3>Final Pre-Launch Verification</h3></div>
+        <div class="step-body">
+          <ul class="checklist">
+            <li><div class="check-box"></div><div class="check-text">
+              <b>Google Drive folders created</b> — <span>Root folder + 4 subfolders in correct hierarchy</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>Dashboard spreadsheet operational</b> — <span>Clients, URS_Registry, Financial_Summary tabs present with correct headers</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>All CONFIG values filled</b> — <span>No "PASTE_YOUR..." placeholders remain in the Apps Script</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM-RIS-002 Google Form live</b> — <span>12 fields present with correct labels (Date included; Affiliation removed); linked to dashboard; form submit trigger active</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM-RIS-003 Google Form live</b> — <span>Survey URL updated in Apps Script; linked to dashboard</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM-RIS-059 template Doc ready</b> — <span>All 5 placeholders present; 5-column table with 1 data row; Doc ID in CONFIG</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>FM-RIS-060 template Doc ready</b> — <span>All 3 placeholders present; 5-column table; "Finance Office" in body; Doc ID in CONFIG</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>End-to-end test passed</b> — <span>Submitted test form → dashboard row logged → emails received → PDF generated correctly</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>Google Sites portal published</b> — <span>All 6 pages live; FM-RIS-002 form embedded on Services page; branding applied</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>URS Registry populated</b> — <span>All active URS added with correct names (spelling must match Assigned URS entries)</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>Delete test data rows</b> — <span>Remove all test entries from the Clients sheet before announcing to real clients</span>
+            </div></li>
+            <li><div class="check-box"></div><div class="check-text">
+              <b>Share the portal URL</b> — <span>Add to email signature, RISE Center website, departmental bulletin boards</span>
+            </div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         MAINTENANCE
+         ═══════════════════════════════════════════ -->
+    <div id="maint" class="phase-section">
+      <div class="phase-hdr">
+        <div class="phase-num">✦</div>
+        <div>
+          <div class="phase-title">Semester Maintenance &amp; Operations</div>
+          <div class="phase-sub">Recurring tasks at start and end of each semester</div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">▶</div><h3>Start of Semester Tasks</h3></div>
+        <div class="step-body">
+          <ul class="checklist">
+            <li><div class="check-box"></div><div class="check-text"><b>Update URS Registry</b> — <span>Add/remove URS; update AY Appointed for newly appointed statisticians</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>Archive last semester's data</b> — <span>Export Clients sheet as CSV/XLSX to Client Records Archive folder</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>Clear the Clients sheet</b> — <span>Delete all data rows (NOT the header row) for the new semester</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>Update fees if changed</b> — <span>Edit the FEES object in the Apps Script CONFIG if the fee schedule changes</span></div></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-hdr"><div class="step-num">◼</div><h3>End of Semester Tasks</h3></div>
+        <div class="step-body">
+          <ul class="checklist">
+            <li><div class="check-box"></div><div class="check-text"><b>Generate FM-RIS-059</b> — <span>🎯 ISRM Operations → Generate Reports → FM-RIS-059</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>Generate FM-RIS-060</b> — <span>🎯 ISRM Operations → Generate Reports → FM-RIS-060 (after all OR numbers are entered)</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>Print and get signatures</b> — <span>Print PDFs → ISM Officer signs → RISE Center Director "Noted by" → submit FM-RIS-060 to Finance Office</span></div></li>
+            <li><div class="check-box"></div><div class="check-text"><b>File PDFs in Drive</b> — <span>Signed scans go into Client Records Archive folder for the semester</span></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Note at end -->
+    <div class="note info">
+      <div class="note-icon">📞</div>
+      <div style="font-size:12px;">
+        <b>Questions during setup?</b> Most issues involve incorrect field label spelling in the Google Form
+        (must exactly match <code>e.namedValues</code> keys in the script) or missing
+        <code>{{PLACEHOLDER}}</code> tags in the Google Doc templates.
+        Check the <code>isrm_form_templates_v2.html</code> reference file for the exact tag positions.
+        The Apps Script execution log (Apps Script editor → Executions on left sidebar)
+        shows detailed error messages for any failed runs.
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<div style="text-align:center;font-size:11px;color:var(--muted);padding:16px 24px 28px;
+  background:var(--navyD);color:rgba(255,255,255,.45);">
+  ISRM Digital Operations System Installation Guide v2.0 · Saint Louis University · Baguio City<br>
+  Research, Innovation, and Sustainable Extension Center (RISE Center) · 2025<br>
+  Forms: 

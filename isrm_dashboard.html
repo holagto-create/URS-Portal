@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISRM Dashboard — RISE Center, SLU</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Lato:ital,wght@0@0;400;0;700;1;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1A3666; --navyD:#0F2245; --navyM:#2A509E; --navyL:#3D6DB5;
+      --gold:#C8943A; --goldL:#F0C060; --goldPale:#FDF5E6;
+      --bg:#EDF1F8; --card:#FFFFFF; --text:#1C2340; --muted:#607090;
+      --border:#C4CFDF;
+      --ok:#1A7A3C; --okBg:#E8F5E9;
+      --warn:#9A6200; --warnBg:#FFF3CD;
+      --new:#6B2D8A; --newBg:#F3EAF7;
+      --prog:#1055B5; --progBg:#EEF2FA;
+      --err:#B01E28; --errBg:#FDECEA;
+      --gray:#607090; --grayBg:#F0F2F5;
+      --radius:8px; --shadow:0 2px 10px rgba(0,0,0,.06);
+    }
+    body { font-family: 'Lato', sans-serif; background: var(--bg); color: var(--text); font-size: 13px; min-height: 100vh; }
+
+    /* ── HEADER ── */
+    .hdr {
+      background: linear-gradient(135deg, var(--navyD) 0%, var(--navy) 55%, var(--navyM) 100%);
+      box-shadow: 0 3px 18px rgba(10,26,60,.38);
+      padding: 14px 26px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .hdr-seal {
+      width:46px; height:46px; border-radius:50%; flex-shrink:0;
+      background: var(--gold); display:flex; align-items:center; justify-content:center;
+      font-family: 'Playfair Display', serif; font-size:15px; font-weight:800; color:var(--navyD);
+    }
+    .hdr-title { font-family: 'Playfair Display', serif; color:#fff; font-size:17px; font-weight:700; line-height:1.3; }
+    .hdr-sub { color:rgba(255,255,255,.55); font-size:10; letter-spacing:.12em; text-transform:uppercase; margin-top:2px; }
+    .hdr-right { margin-left:auto; text-align:right; flex-shrink:0; }
+    .hdr-sem { color:var(--goldL); font-size:11px; font-weight:700; }
+    .hdr-date { color:rgba(255,255,255,.45); font-size:10; margin-top:3px; }
+
+    /* ── NAV TABS ── */
+    .nav {
+      background: var(--navyD);
+      display: flex; padding: 0 26px; gap: 2px;
+      overflow-x: auto; scrollbar-width: thin;
+    }
+    .nav-btn {
+      padding: 11px 18px; background: none; border: none;
+      color: rgba(255,255,255,.5); cursor: pointer;
+      font-family: 'Lato', sans-serif; font-weight:700;
+      font-size: 10.5px; letter-spacing:.1em; text-transform:uppercase;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .nav-btn:hover { color: rgba(255,255,255,.85); }
+    .nav-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+    /* ── MAIN ── */
+    .main { padding: 22px 26px; max-width: 1140px; margin: 0 auto; }
+
+    /* ── LOADING ── */
+    .loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:60px; color:var(--muted); }
+    .spinner { width:22px; height:22px; border:3px solid var(--border); border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+
+    /* ── STAT GRID ── */
+    .stat-grid { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding:18px; flex:1; min-width:130px;
+      display:flex; justify-content:space-between; align-items:flex-start;
+    }
+    .stat-label { font-size:9px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+    .stat-value { font-family: 'Playfair Display', serif; font-size:22px; font-weight:700; color:var(--text); line-height:1; }
+    .stat-sub { font-size:10.5px; color:var(--muted); margin-top:5px; }
+    .stat-icon { font-size:22px; opacity:.6; }
+
+    /* ── BADGE ── */
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:4px;
+      font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+      border: 1px solid transparent; white-space:nowrap;
+    }
+    .badge-Paid       { color:var(--ok);   background:var(--okBg);   border-color:rgba(26,122,60,.2); }
+    .badge-Pending    { color:var(--warn); background:var(--warnBg); border-color:rgba(154,98,0,.2); }
+    .badge-Completed  { color:var(--ok);   background:var(--okBg);   border-color:rgba(26,122,60,.2); }
+    .badge-In Progress{ color:var(--prog); background:var(--progBg);border-color:rgba(16,85,181,.2); }
+    .badge-New        { color:var(--new);  background:var(--newBg); border-color:rgba(107,45,138,.2); }
+    .badge-Cancelled  { color:var(--err);  background:var(--errBg);  border-color:rgba(176,30,40,.2); }
+    .badge-Active     { color:var(--ok);   background:var(--okBg);   border-color:rgba(26,122,60,.2); }
+    .badge-Inactive   { color:var(--gray); background:var(--grayBg);border-color:rgba(96,112,144,.2); }
+    .badge-SLU        { color:var(--navy); background:var(--progBg); border-color:rgba(26,54,102,.2); }
+    .badge-Non-SLU    { color:var(--gray); background:var(--grayBg);border-color:rgba(96,112,144,.2); }
+    .badge-Undergraduate{ color:var(--prog); background:var(--progBg);border-color:rgba(16,85,181,.2); }
+    .badge-Graduate   { color:var(--new);  background:var(--newBg); border-color:rgba(107,45,138,.2); }
+    .badge-Staff      { color:var(--gold); background:var(--goldPale); border-color:rgba(200,148,58,.2); }
+
+    /* ── BUTTON ── */
+    .btn {
+      border: none; border-radius:5px; cursor:pointer;
+      padding: 8px 16px; font-size:12px; font-weight:700; letter-spacing:.05em;
+      font-family: 'Lato', sans-serif; transition: opacity .15s;
+    }
+    .btn:hover { opacity:.82; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-primary { background:var(--navy); color:#fff; }
+    .btn-gold    { background:var(--gold); color:#fff; }
+    .btn-outline { background:transparent; color:var(--navy); border:1.5px solid var(--navy); }
+    .btn-ghost   { background:#F0F4FA; color:var(--text); }
+    .btn-danger  { background:var(--err); color:#fff; }
+    .btn-sm { padding:5px 11px; font-size:10.5px; }
+
+    /* ── SECTION HEADER ── */
+    .shead { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .shead h2 { font-family: 'Playfair Display', serif; font-size:17px; font-weight:700; color:var(--navy); }
+    .shead-meta { font-size:11px; color:var(--muted); }
+
+    /* ── FORM CONTROLS ── */
+    .fin { border:1px solid var(--border); border-radius:5px; padding:7px 10px; font-size:12.5px; font-family:'Lato',sans-serif; color:var(--text); background:#fff; outline:none; width:100%; }
+    .fin:focus { border-color:var(--navy); }
+
+    /* ── DASHBOARD ── */
+    .dash-grid { display:grid; grid-template-columns:1fr 320px; gap:16px; }
+    .dash-activity-item {
+      display:flex; align-items:center; gap:14px; padding:11px 18px;
+      cursor:pointer; transition: background .12s;
+    }
+    .dash-activity-item:hover { background:var(--bg); }
+    .avatar { width:36px; height:36px; border-radius:50%; background:var(--navyD); color:var(--gold); display:flex; align-items:center; justify-content:center; font-family:'Playfair Display', serif; font-size:13px; font-weight:700; flex-shrink:0; }
+    .dash-activity-item + .dash-activity-item { border-top:1px solid var(--bg); }
+    .dash-pending-item { padding:12px 16px; border-bottom:1px solid var(--bg); cursor:pointer; transition: background .12s; }
+    .dash-pending-item:hover { background:var(--warnBg); }
+    .dash-pending-item + .dash-pending-item { border-top:1px solid var(--bg); }
+
+    /* ── CLIENTS TABLE ── */
+    .tbl-wrap { overflow-x: auto; }
+    table.tbl { width:100%; border-collapse:collapse; font-size:12px; }
+    table.tbl th { padding:9px 12px; text-align:left; font-weight:700; font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.85); white-space:nowrap; }
+    table.tbl thead tr { background:var(--navyD); }
+    table.tbl td { padding:9px 12px; }
+    table.tbl tbody tr { background:#fff; cursor:pointer; transition:background .1s; }
+    table.tbl tbody tr:nth-child(even) { background:var(--bg); }
+    table.tbl tbody tr:hover { background:#E8EFF8; }
+    table.tbl tfoot tr { background:#F5F8FF; border-top:2px solid var(--border); }
+    .filter-row { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+
+    /* ── URS CARDS ── */
+    .urs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(295px,1fr)); gap:14px; }
+    .urs-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; }
+    .urs-avatar { width:48px; height:48px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,var(--navyD),var(--navyM)); color:var(--gold); display:flex; align-items:center; justify-content:center; font-family:'Playfair Display', serif; font-size:18px; font-weight:700; }
+    .urs-row { font-size:11px; margin-bottom:7px; }
+    .urs-stat-bar { display:flex; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin:12px 0; padding:10px 0; gap:0; }
+    .urs-stat { flex:1; text-align:center; border-right:1px solid var(--border); }
+    .urs-stat:last-child { border-right:none; }
+    .urs-stat-val { font-family:'Playfair Display', serif; font-size:20px; font-weight:700; }
+    .urs-stat-lbl { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+
+    /* ── FINANCIAL ── */
+    .split-bar { height:16px; border-radius:8px; overflow:hidden; display:flex; margin-bottom:10px; }
+    .split-urs { background:linear-gradient(90deg,var(--navyD),var(--navyM)); transition:width .6s; }
+    .split-unit { background:linear-gradient(90deg,var(--gold),var(--goldL)); transition:width .6s; }
+    .fin-legend { display:flex; gap:24px; }
+    .fin-legend-item { display:flex; align-items:center; gap:8px; font-size:12px; }
+    .fin-dot { width:10px; height:10px; border-radius:2px; }
+
+    /* ── REPORTS ── */
+    .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+    .report-card { padding:20px; }
+    .report-icon { width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .report-desc { font-size:12px; color:var(--muted); line-height:1.65; margin-bottom:14px; }
+    .report-summary { background:var(--bg); border-radius:6px; padding:10px 14px; margin-bottom:16px; }
+    .report-summary-row { display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:4px; }
+    .report-summary-row:last-child { margin-bottom:0; }
+    .report-60-40 { margin-top:20px; padding:12px 16px; background:var(--goldPale); border-left:4px solid var(--gold); border-radius:0 6px 6px 0; font-size:12px; color:var(--muted); line-height:1.7; }
+
+    /* ── MODAL ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(10,20,50,.6); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto; }
+    .modal-box { background:var(--card); border-radius:10px; width:100%; max-width:660px; max-height:92vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,.28); }
+    .modal-hdr { background:linear-gradient(135deg,var(--navyD),var(--navy)); padding:16px 22px; border-radius:10px 10px 0 0; display:flex; justify-content:space-between; align-items:flex-start; }
+    .modal-hdr-title { font-family:'Playfair Display', serif; color:var(--gold); font-size:17px; font-weight:700; }
+    .modal-hdr-sub { color:rgba(255,255,255,.7); font-size:11.5px; margin-top:3px; }
+    .modal-close { background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; font-size:22px; line-height:1; padding:0 4px; }
+    .modal-body { padding:24px; }
+    .modal-field { margin-bottom:13px; }
+    .modal-field-label { font-size:9.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; margin-bottom:5px; }
+    .modal-split { background:linear-gradient(135deg,var(--navyD),var(--navy)); border-radius:8px; padding:14px 18px; margin-bottom:18px; }
+    .modal-split-label { color:rgba(255,255,255,.6); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:10px; }
+    .modal-split-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .modal-split-val { font-family:'Playfair Display', serif; font-size:18px; font-weight:700; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+
+    /* ── REPORT MODAL ── */
+    .report-modal-box { background:#fff; border-radius:8px; width:100%; max-width:720px; box-shadow:0 24px 64px rgba(0,0,0,.3); margin-bottom:24px; }
+    .report-modal-hdr { background:var(--navyD); padding:12px 20px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; }
+    .report-modal-body { padding:28px 40px; font-size:12px; color:var(--text); line-height:1.65; }
+    .report-letterhead { text-align:center; margin-bottom:22px; padding-bottom:16px; border-bottom:2.5px solid var(--navy); }
+    .report-letterhead-univ { font-family:'Playfair Display', serif; font-size:17px; font-weight:800; color:var(--navy); letter-spacing:.03em; }
+    .report-letterhead-center { font-size:10.5px; color:var(--muted); margin-top:3px; }
+    .report-letterhead-title { margin-top:12px; font-size:14px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.08em; }
+
+    /* ── POLICY BOX ── */
+    .policy-box { margin-top:20px; padding:12px 18px; background:var(--goldPale); border-left:4px solid var(--gold); border-radius:0 6px 6px 0; font-size:12px; color:var(--muted); line-height:1.7; }
+
+    /* ── EMPTY STATE ── */
+    .empty-state { padding:36px; text-align:center; color:var(--muted); font-style:italic; }
+
+    /* ── CARD INNER PADDING ── */
+    .card-p { padding: 20px; }
+    .card-header { padding:13px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .card-header h3 { font-family:'Playfair Display', serif; font-size:14px; font-weight:700; color:var(--navy); }
+    .section-hdr { padding:8px 18px; background:#F5F8FF; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .section-footer { padding:10px 18px; background:var(--navyD); display:flex; justify-content:space-between; border-radius:0 0 8px 8px; }
+    .section-footer-total { font-weight:700; color:#fff; font-size:13px; }
+    .section-footer-grand { font-weight:700; color:var(--goldL); font-family:'Playfair Display', serif; }
+
+    /* ── ALERTS ── */
+    .alert { padding:12px 16px; border-radius:6px; font-size:12px; margin-bottom:14px; }
+    .alert-warn { background:var(--warnBg); border-left:4px solid var(--warn); color:var(--warn); }
+
+    /* ── TOAST ── */
+    .toast {
+      position:fixed; bottom:24px; right:24px; z-index:2000;
+      background:var(--navyD); color:#fff; padding:12px 20px;
+      border-radius:6px; font-size:12px; font-weight:700;
+      box-shadow:0 4px 16px rgba(0,0,0,.3);
+      opacity:0; transform:translateY(10px); transition:opacity .2s, transform .2s;
+    }
+    .toast.show { opacity:1; transform:translateY(0); }
+    .toast-ok   { background:var(--ok); }
+    .toast-err  { background:var(--err); }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="hdr">
+  <div class="hdr-seal">SLU</div>
+  <div>
+    <div class="hdr-title">ISRM Officer's Command Center</div>
+    <div class="hdr-sub">Institutional Studies &amp; Research Methods — RISE Center &middot; Saint Louis University</div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-sem" id="hdr-sem"></div>
+    <div class="hdr-date" id="hdr-date"></div>
+  </div>
+</div>
+
+<!-- ── NAV TABS ── -->
+<div class="nav">
+  <button class="nav-btn active" data-view="dashboard">&#128202; Dashboard</button>
+  <button class="nav-btn" data-view="clients">&#128203; Clients <span id="nav-clients-count"></span></button>
+  <button class="nav-btn" data-view="urs">&#128101; URS Registry</button>
+  <button class="nav-btn" data-view="financial">&#128176; Financial</button>
+  <button class="nav-btn" data-view="reports">&#128196; Reports</button>
+</div>
+
+<!-- ── MAIN CONTENT ── -->
+<div class="main" id="main-content">
+  <div class="loading"><div class="spinner"></div>Loading dashboard...</div>
+</div>
+
+<!-- ── MODAL (shared) ── -->
+<div id="modal-root" style="display:none;"></div>
+
+<!-- ── TOAST ── -->
+<div id="toast" class="toast"></div>
+
+<script>
+  // ═══════════════════════════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════════════════════════
+  const state = {
+    view: 'dashboard',
+    clients: [],
+    urs: [],
+    financial: {},
+    config: {},
+    loading: true,
+    filterPay: 'All',
+    filterStat: 'All',
+    filterURS: 'All',
+    searchQ: '',
+    selectedClient: null,
+    reportType: null,
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════════════════════════════════
+  const peso = n => `₱${Number(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const initials = name => (name||'').split(' ').filter(w=>!['Dr.','Prof.','Mr.','Ms.','Mrs.'].includes(w)).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const badge = s => {
+    if (!s) return '<span class="badge badge-Inactive">—</span>';
+    return `<span class="badge badge-${s.replace(/\s/g,'')}">${s}</span>`;
+  };
+  const URS_PCT = 0.60, UNIT_PCT = 0.40;
+
+  function toast(msg, type='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast toast-${type} show`;
+    setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    const date = new Date(d);
+    if (isNaN(date)) return d;
+    return date.toLocaleDateString('en-PH', {year:'numeric',month:'2-digit',day:'2-digit'});
+  }
+
+  function fmtFullDate(d) {
+    if (!d) return new Date().toLocaleDateString('en-PH', {year:'numeric',month:'long',day:'numeric'});
+    return new Date(d).toLocaleDateString('en-PH', {year:'numeric',month:'long',day:'numeric'});
+  }
+
+  // Get field value safely (handles both object props and array indices)
+  function g(obj, key, fallback='') {
+    if (obj === null || obj === undefined) return fallback;
+    if (typeof obj === 'object' && !Array.isArray(obj)) {
+      return obj[key] !== undefined ? obj[key] : fallback;
+    }
+    return fallback;
+  }
+
+  // Map row array to named fields (for both object and array responses)
+  function mapClient(row, headers) {
+    if (Array.isArray(row)) {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i]; });
+      return obj;
+    }
+    return row;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  DATA LOADING
+  // ═══════════════════════════════════════════════════════════
+  function loadAll() {
+    state.loading = true;
+    renderLoading();
+    google.script.run
+      .withSuccessHandler(data => {
+        state.clients = (data.clients||[]).map(c => ({
+          row: g(c,'row'),
+          id: g(c,'Record ID'),
+          date: g(c,'Date'),
+          name: g(c,'Client Name'),
+          idNum: g(c,'ID Number'),
+          contact: g(c,'Contact No.'),
+          email: g(c,'Email'),
+          department: g(c,'Department/School'),
+          title: g(c,'Research Title'),
+          funding: g(c,'Funding Source'),
+          category: g(c,'Category'),
+          affiliation: g(c,'Affiliation'),
+          service: g(c,'Service Type'),
+          hours: g(c,'Hours', 1),
+          totalFee: parseFloat(g(c,'Total Fee (₱)',0))||0,
+          orNum: g(c,'OR Number'),
+          payDate: g(c,'Payment Date'),
+          payStatus: g(c,'Payment Status'),
+          assignedURS: g(c,'Assigned URS'),
+          ursShare: parseFloat(g(c,'URS Share 60% (₱)',0))||0,
+          unitShare: parseFloat(g(c,'Unit Share 40% (₱)',0))||0,
+          semester: g(c,'Semester'),
+          ay: g(c,'AY'),
+          status: g(c,'Status'),
+          remarks: g(c,'Remarks'),
+        }));
+        state.urs = (data.urs||[]).map(u => ({
+          id: g(u,'URS ID'),
+          name: g(u,'Full Name'),
+          department: g(u,'Department'),
+          degree: g(u,'Highest Degree'),
+          specialization: g(u,'Specialization'),
+          email: g(u,'Email'),
+          contact: g(u,'Contact No.'),
+          available: g(u,'Available Days/Hours'),
+          status: g(u,'Status'),
+          ay: g(u,'AY Appointed'),
+        }));
+        state.financial = data.financial||{};
+        state.config = data.config||{};
+        state.loading = false;
+        updateHeader();
+        renderView();
+      })
+      .withFailureHandler(err => {
+        state.loading = false;
+        toast('Failed to load data: ' + err.message, 'err');
+        renderError(err.message);
+      })
+      .getDashboardData();
+  }
+
+  function updateClientInState(rowNum, updates) {
+    const idx = state.clients.findIndex(c => String(c.row) === String(rowNum));
+    if (idx !== -1) {
+      Object.assign(state.clients[idx], updates);
+    }
+    recalcFinancial();
+  }
+
+  function recalcFinancial() {
+    const paid = state.clients.filter(c => g(c,'payStatus') === 'Paid');
+    state.financial = {
+      grossFees: paid.reduce((s,c) => s + (g(c,'totalFee')||0), 0),
+      ursHonoraria: paid.reduce((s,c) => s + (g(c,'ursShare')||0), 0),
+      unitShare: paid.reduce((s,c) => s + (g(c,'unitShare')||0), 0),
+      paidCount: paid.length,
+      pendingCount: state.clients.filter(c => g(c,'payStatus') === 'Pending').length,
+      completedCount: state.clients.filter(c => g(c,'status') === 'Completed').length,
+      inProgressCount: state.clients.filter(c => g(c,'status') === 'In Progress').length,
+      newCount: state.clients.filter(c => g(c,'status') === 'New').length,
+      totalCount: state.clients.length,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  HEADER
+  // ═══════════════════════════════════════════════════════════
+  function updateHeader() {
+    const sem = state.config.sem || 'First Semester';
+    const ay  = state.config.ay  || '2025-2026';
+    document.getElementById('hdr-sem').textContent = `${sem}, AY ${ay}`;
+    document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-PH', {dateStyle:'long'});
+    const count = state.clients.length;
+    document.getElementById('nav-clients-count').textContent = count > 0 ? `(${count})` : '';
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  VIEWS
+  // ═══════════════════════════════════════════════════════════
+  function renderLoading() {
+    document.getElementById('main-content').innerHTML = '<div class="loading"><div class="spinner"></div>Loading dashboard...</div>';
+  }
+
+  function renderError(msg) {
+    document.getElementById('main-content').innerHTML = `<div class="empty-state">Error loading data: ${msg}</div>`;
+  }
+
+  function renderView() {
+    const views = { dashboard: renderDashboard, clients: renderClients, urs: renderURS, financial: renderFinancial, reports: renderReports };
+    (views[state.view] || renderDashboard)();
+    updateNavActive();
+  }
+
+  function updateNavActive() {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === state.view);
+    });
+  }
+
+  // ── DASHBOARD ───────────────────────────────────────────
+  function renderDashboard() {
+    const fin = state.financial;
+    const clients = state.clients;
+    const paid = clients.filter(c => g(c,'payStatus') === 'Pending');
+    const recent = [...clients].sort((a,b) => String(g(b,'id')||'').localeCompare(String(g(a,'id')||''))).slice(0,5);
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Gross Fees Collected</div>
+            <div class="stat-value" style="color:var(--ok)">${peso(g(fin,'grossFees'))}</div>
+            <div class="stat-sub">${g(fin,'paidCount')} paid &middot; ${g(fin,'pendingCount')} pending</div>
+          </div>
+          <div class="stat-icon">&#128176;</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">URS Honoraria (60%)</div>
+            <div class="stat-value" style="color:var(--navy)">${peso(g(fin,'ursHonoraria'))}</div>
+            <div class="stat-sub">Total accrued to URS</div>
+          </div>
+          <div class="stat-icon">&#128101;</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Unit Retained (40%)</div>
+            <div class="stat-value" style="color:var(--gold)">${peso(g(fin,'unitShare'))}</div>
+            <div class="stat-sub">ISRM unit share</div>
+          </div>
+          <div class="stat-icon">&#127984;</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Pending Payment</div>
+            <div class="stat-value" style="color:var(--warn)">${g(fin,'pendingCount')}</div>
+            <div class="stat-sub">Action required</div>
+          </div>
+          <div class="stat-icon">&#9203;</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Active Consultations</div>
+            <div class="stat-value" style="color:var(--prog)">${g(fin,'inProgressCount')}</div>
+            <div class="stat-sub">In Progress</div>
+          </div>
+          <div class="stat-icon">&#128203;</div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Completed</div>
+            <div class="stat-value" style="color:var(--ok)">${g(fin,'completedCount')}</div>
+            <div class="stat-sub">of ${g(fin,'totalCount')} total</div>
+          </div>
+          <div class="stat-icon">&#9989;</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Client Activity</h3>
+            <button class="btn btn-ghost btn-sm" onclick="switchView('clients')">View All &rarr;</button>
+          </div>
+          ${recent.length === 0 ? '<div class="empty-state">No records yet.</div>' :
+            recent.map(c => `
+            <div class="dash-activity-item" data-row="${g(c,'row')}" data-client='${JSON.stringify(c).replace(/'/g,'&#39;')}'>
+              <div class="avatar">${initials(g(c,'name'))}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:12.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${g(c,'name')||'—'}</div>
+                <div style="font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${g(c,'title')||'—'}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-right:8px;">
+                <div style="font-size:12px;font-weight:700;color:var(--text);">${peso(g(c,'totalFee'))}</div>
+                <div style="margin-top:3px;">${badge(g(c,'payStatus'))}</div>
+              </div>
+              ${badge(g(c,'status'))}
+            </div>`).join('')
+          }
+        </div>
+
+        <div class="card">
+          <div class="card-header" style="background:var(--warnBg);">
+            <h3 style="color:var(--warn);">&#9888; Action Required</h3>
+          </div>
+          ${paid.length === 0 ? '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">&#9989; All payments verified</div>' :
+            paid.map(c => `
+            <div class="dash-pending-item" data-row="${g(c,'row')}" data-client='${JSON.stringify(c).replace(/'/g,'&#39;')}'>
+              <div style="font-size:12px;font-weight:700;color:var(--text);">${g(c,'name')||'—'}</div>
+              <div style="font-size:10.5px;color:var(--muted);margin:2px 0;">${g(c,'service')||'—'}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+                <span style="font-size:12px;font-weight:700;color:var(--warn);">${peso(g(c,'totalFee'))}</span>
+                ${g(c,'assignedURS')
+                  ? `<span style="font-size:10px;color:var(--muted);">URS: ${g(c,'assignedURS').split(' ').pop()}</span>`
+                  : `<span style="font-size:10px;color:var(--err);font-weight:700;">&#9888; No URS</span>`
+                }
+              </div>
+            </div>`).join('')
+          }
+          <div style="padding:12px 16px;background:var(--goldPale);border-top:1px solid var(--border);border-radius:0 0 8px 8px;">
+            <div style="font-size:9.5px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">60/40 Split Rule</div>
+            <div style="font-size:11px;color:var(--text);line-height:1.6;">URS receives <strong>60%</strong> of every client fee.<br>ISRM unit retains <strong>40%</strong>.</div>
+          </div>
+        </div>
+      </div>`;
+
+    attachActivityHandlers();
+  }
+
+  // ── CLIENTS TABLE ────────────────────────────────────────
+  function getFilteredClients() {
+    return state.clients.filter(c => {
+      if (state.filterPay !== 'All' && g(c,'payStatus') !== state.filterPay) return false;
+      if (state.filterStat !== 'All' && g(c,'status') !== state.filterStat) return false;
+      if (state.filterURS !== 'All') {
+        if (state.filterURS === 'Unassigned' && g(c,'assignedURS')) return false;
+        if (state.filterURS !== 'Unassigned' && g(c,'assignedURS') !== state.filterURS) return false;
+      }
+      if (state.searchQ) {
+        const q = state.searchQ.toLowerCase();
+        const searchable = `${g(c,'name')} ${g(c,'title')} ${g(c,'id')} ${g(c,'department')} ${g(c,'idNum')}`.toLowerCase();
+        if (!searchable.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderClients() {
+    const filtered = getFilteredClients();
+    const ursNames = [...new Set(state.urs.filter(u => g(u,'status') === 'Active').map(u => g(u,'name')))];
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="shead">
+        <h2>Client Records (${filtered.length} of ${state.clients.length})</h2>
+      </div>
+      <div class="filter-row">
+        <input class="fin" id="search-q" placeholder="&#128269; Search name &middot; title &middot; record ID &middot; department&middot;&middot;&middot;" value="${escHtml(state.searchQ)}" style="max-width:300px;"/>
+        <select class="fin" id="filter-pay" style="width:130px;">
+          ${['All','Paid','Pending'].map(v => `<option value="${v}" ${state.filterPay===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <select class="fin" id="filter-stat" style="width:145px;">
+          ${['All','New','In Progress','Completed','Cancelled'].map(v => `<option value="${v}" ${state.filterStat===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <select class="fin" id="filter-urs" style="width:175px;">
+          ${['All',...ursNames,'Unassigned'].map(v => `<option value="${v}" ${state.filterURS===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+        ${(state.searchQ || state.filterPay !== 'All' || state.filterStat !== 'All' || state.filterURS !== 'All') ?
+          `<button class="btn btn-ghost btn-sm" id="clear-filters">&#10005; Clear</button>` : ''}
+      </div>
+
+      <div class="card card-p tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Record ID</th><th>Date</th><th>Client</th><th>Dept / School</th>
+              <th>Service</th><th>Total Fee</th><th>OR #</th>
+              <th>Pay</th><th>URS Assigned</th><th>60% Share</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.length === 0 ? `<tr><td colspan="12" class="empty-state">No records match the current filters.</td></tr>` :
+              filtered.map(c => `
+              <tr data-row="${g(c,'row')}" data-client='${JSON.stringify(c).replace(/'/g,'&#39;')}'>
+                <td><span style="font-weight:700;color:var(--navy);font-size:11px;">${g(c,'id')||'—'}</span></td>
+                <td><span style="color:var(--muted);font-size:11px;white-space:nowrap;">${fmtDate(g(c,'date'))}</span></td>
+                <td>
+                  <div style="font-weight:700;">${g(c,'name')||'—'}</div>
+                  <div style="margin-top:2px;display:flex;gap:4px;">
+                    ${badge(g(c,'category'))}
+                    ${g(c,'affiliation') ? badge(g(c,'affiliation')) : '<span class="badge" style="color:var(--warn);background:var(--warnBg);border-color:rgba(154,98,0,.2);font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700;">Affiliation?</span>'}
+                  </div>
+                </td>
+                <td><span style="color:var(--muted);font-size:11px;display:block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${g(c,'department')||'—'}</span></td>
+                <td><span style="white-space:nowrap;">${g(c,'service')||'—'}</span></td>
+                <td><span style="font-weight:700;">${peso(g(c,'totalFee'))}</span></td>
+                <td><span style="font-size:11px;color:${g(c,'orNum')?'var(--text)':'var(--muted)'}">${g(c,'orNum')||'—'}</span></td>
+                <td>${badge(g(c,'payStatus'))}</td>
+                <td><span style="font-size:11px;color:${g(c,'assignedURS')?'var(--navy)':'var(--err)'};font-weight:${g(c,'assignedURS')?700:400};">${g(c,'assignedURS')||'&#9888; Unassigned'}</span></td>
+                <td><span style="font-weight:700;color:var(--ok);white-space:nowrap;">${peso(g(c,'ursShare'))}</span></td>
+                <td>${badge(g(c,'status'))}</td>
+                <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+              </tr>`).join('')
+            }
+          </tbody>
+          ${filtered.length > 0 ? `
+          <tfoot>
+            <tr>
+              <td colspan="5" style="font-weight:700;font-size:11px;color:var(--navy);">SUBTOTALS &mdash; ${filtered.length} record${filtered.length!==1?'s':''}</td>
+              <td style="font-weight:700;">${peso(filtered.reduce((s,c)=>s+(g(c,'totalFee')||0),0))}</td>
+              <td colspan="3"></td>
+              <td style="font-weight:700;color:var(--ok);">${peso(filtered.reduce((s,c)=>s+(g(c,'ursShare')||0),0))}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>` : ''}
+        </table>
+      </div>`;
+
+    attachClientsTableHandlers();
+  }
+
+  // ── URS REGISTRY ─────────────────────────────────────────
+  function renderURS() {
+    const sem = state.config.sem || 'First Semester';
+    const ay  = state.config.ay  || '2025-2026';
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="shead">
+        <h2>University Research Statisticians Registry</h2>
+        <span class="shead-meta">AY ${ay} &middot; ${state.urs.filter(u => g(u,'status')==='Active').length} active</span>
+      </div>
+      <div class="urs-grid">
+        ${state.urs.length === 0 ? '<div class="empty-state">No URS records found. Add them to the URS_Registry sheet.</div>' :
+          state.urs.map(u => {
+            const handled = state.clients.filter(c => g(c,'assignedURS') === g(u,'name') && g(c,'payStatus') === 'Paid');
+            const earned  = handled.reduce((s,c) => s + (g(c,'ursShare')||0), 0);
+            const done    = handled.filter(c => g(c,'status') === 'Completed').length;
+            const active  = handled.filter(c => g(c,'status') === 'In Progress').length;
+            return `
+            <div class="urs-card">
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+                <div class="urs-avatar">${initials(g(u,'name'))}</div>
+                <div>
+                  <div style="font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--navy);">${g(u,'name')||'—'}</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:1px;">${g(u,'department')||'—'}</div>
+                  <div style="margin-top:4px;">${badge(g(u,'status'))}</div>
+                </div>
+              </div>
+              <div class="urs-row"><strong>&#127891; Degree:</strong> ${g(u,'degree')||'—'}</div>
+              <div class="urs-row"><strong>&#128300; Specialization:</strong> ${g(u,'specialization')||'—'}</div>
+              <div class="urs-row"><strong>&#128197; Available:</strong> ${g(u,'available')||'—'}</div>
+              <div class="urs-row"><strong>&#9993; Email:</strong> ${g(u,'email')||'—'}</div>
+              <div class="urs-stat-bar">
+                <div class="urs-stat"><div class="urs-stat-val" style="color:var(--navy);">${handled.length}</div><div class="urs-stat-lbl">Clients</div></div>
+                <div class="urs-stat"><div class="urs-stat-val" style="color:var(--ok);">${done}</div><div class="urs-stat-lbl">Completed</div></div>
+                <div class="urs-stat"><div class="urs-stat-val" style="color:var(--prog);">${active}</div><div class="urs-stat-lbl">Active</div></div>
+              </div>
+              <div style="background:var(--bg);border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;color:var(--muted);font-weight:700;">Honoraria (60%):</span>
+                <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--ok);">${peso(earned)}</span>
+              </div>
+            </div>`;
+          }).join('')
+        }
+      </div>
+      <div class="policy-box">
+        <strong style="color:var(--text);">RSS Manual &sect;IV.2.4 &mdash; </strong>
+        University Research Statisticians are entitled to <strong>60%</strong> of all fees collected for services they render.
+        Honoraria are paid by the Finance Office on a yearly basis upon submission of FM-RIS-060, prepared by the ISM Officer and noted by the RISE Center Director.
+      </div>`;
+  }
+
+  // ── FINANCIAL SUMMARY ─────────────────────────────────────
+  function renderFinancial() {
+    const fin = state.financial;
+    const clients = state.clients;
+    const paid = clients.filter(c => g(c,'payStatus') === 'Paid');
+
+    const byURSMap = {};
+    paid.forEach(c => {
+      const k = g(c,'assignedURS') || 'Unassigned';
+      if (!byURSMap[k]) byURSMap[k] = {name:k, count:0, totalFee:0, ursShare:0, unitShare:0};
+      byURSMap[k].count++;
+      byURSMap[k].totalFee  += g(c,'totalFee')||0;
+      byURSMap[k].ursShare  += g(c,'ursShare')||0;
+      byURSMap[k].unitShare += g(c,'unitShare')||0;
+    });
+    const byURS = Object.values(byURSMap).sort((a,b) => b.ursShare - a.ursShare);
+
+    const bySvcMap = {};
+    paid.forEach(c => {
+      const k = g(c,'service')||'—';
+      if (!bySvcMap[k]) bySvcMap[k] = {service:k, count:0, fees:0};
+      bySvcMap[k].count++;
+      bySvcMap[k].fees += g(c,'totalFee')||0;
+    });
+    const bySvc = Object.values(bySvcMap).sort((a,b) => b.fees - a.fees);
+
+    const sem = state.config.sem || 'First Semester';
+    const ay  = state.config.ay  || '2025-2026';
+    const totalFee = g(fin,'grossFees')||0;
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="shead"><h2>Financial Summary</h2></div>
+      <div class="stat-grid" style="margin-bottom:18px;">
+        <div class="stat-card">
+          <div><div class="stat-label">Gross Fees Collected</div><div class="stat-value" style="color:var(--ok)">${peso(totalFee)}</div><div class="stat-sub">${g(fin,'paidCount')} paid records</div></div>
+          <div class="stat-icon">&#128176;</div>
+        </div>
+        <div class="stat-card">
+          <div><div class="stat-label">URS Honoraria (60%)</div><div class="stat-value" style="color:var(--navy)">${peso(g(fin,'ursHonoraria'))}</div><div class="stat-sub">Total accrued</div></div>
+          <div class="stat-icon">&#128101;</div>
+        </div>
+        <div class="stat-card">
+          <div><div class="stat-label">Unit Retained (40%)</div><div class="stat-value" style="color:var(--gold)">${peso(g(fin,'unitShare'))}</div><div class="stat-sub">ISRM share</div></div>
+          <div class="stat-icon">&#127984;</div>
+        </div>
+      </div>
+
+      <div class="card card-p" style="margin-bottom:16px;">
+        <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:14px;color:var(--navy);margin-bottom:12px;">60 / 40 Split &mdash; ${sem}, AY ${ay}</div>
+        ${totalFee > 0 ? `
+          <div class="split-bar">
+            <div class="split-urs"  style="width:${(g(fin,'ursHonoraria')/totalFee)*100}%;"></div>
+            <div class="split-unit" style="width:${(g(fin,'unitShare')/totalFee)*100}%;"></div>
+          </div>
+          <div class="fin-legend">
+            <div class="fin-legend-item"><div class="fin-dot" style="background:var(--navy);"></div><span>URS Share 60% &mdash;</span><strong style="color:var(--navy);">${peso(g(fin,'ursHonoraria'))}</strong></div>
+            <div class="fin-legend-item"><div class="fin-dot" style="background:var(--gold);"></div><span>Unit Share 40% &mdash;</span><strong style="color:var(--gold);">${peso(g(fin,'unitShare'))}</strong></div>
+          </div>` :
+          `<div style="color:var(--muted);font-size:12px;font-style:italic;">No paid records yet. Record split will appear here once payments are logged.</div>`
+        }
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+        <div class="card">
+          <div class="card-header"><h3>Honoraria Breakdown by URS</h3></div>
+          <table class="tbl">
+            <thead><tr>
+              <th>URS Name</th><th style="text-align:center;">Clients</th><th>Gross Fees</th><th>URS 60%</th><th>Unit 40%</th>
+            </tr></thead>
+            <tbody>
+              ${byURS.length === 0 ? `<tr><td colspan="5" class="empty-state">No paid records.</td></tr>` :
+                byURS.map(u => `
+                <tr style="border-bottom:1px solid var(--bg);">
+                  <td style="font-weight:700;color:var(--navy);">${u.name}</td>
+                  <td style="text-align:center;">${u.count}</td>
+                  <td>${peso(u.totalFee)}</td>
+                  <td style="font-weight:700;color:var(--ok);">${peso(u.ursShare)}</td>
+                  <td style="color:var(--gold);font-weight:700;">${peso(u.unitShare)}</td>
+                </tr>`).join('')
+              }
+              <tr style="background:#F5F8FF;border-top:2px solid var(--border);font-weight:700;">
+                <td>TOTAL</td><td style="text-align:center;">${g(fin,'paidCount')}</td>
+                <td>${peso(totalFee)}</td>
+                <td style="color:var(--ok);">${peso(g(fin,'ursHonoraria'))}</td>
+                <td style="color:var(--gold);">${peso(g(fin,'unitShare'))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>By Service Type</h3></div>
+          ${bySvc.length === 0 ? '<div class="empty-state">No paid records yet.</div>' :
+            bySvc.map(s => `
+            <div style="padding:10px 16px;border-bottom:1px solid var(--bg);">
+              <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px;">${s.service}</div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;">
+                <span style="color:var(--muted);">${s.count} client${s.count!==1?'s':''}</span>
+                <span style="font-weight:700;color:var(--ok);">${peso(s.fees)}</span>
+              </div>
+              ${totalFee > 0 ? `
+              <div style="margin-top:6px;height:4px;border-radius:2px;background:var(--border);">
+                <div style="height:100%;border-radius:2px;background:linear-gradient(90deg,var(--navy),var(--navyM));width:${(s.fees/totalFee)*100}%;"></div>
+              </div>` : ''}
+            </div>`).join('')
+          }
+        </div>
+      </div>`;
+  }
+
+  // ── REPORTS ───────────────────────────────────────────────
+  function renderReports() {
+    const fin = state.financial;
+    const clients = state.clients;
+    const paid = clients.filter(c => g(c,'payStatus') === 'Paid');
+    const sem = state.config.sem || 'First Semester';
+    const ay  = state.config.ay  || '2025-2026';
+
+    const byURSMap = {};
+    paid.forEach(c => {
+      const k = g(c,'assignedURS') || 'Unassigned';
+      if (!byURSMap[k]) byURSMap[k] = {name:k, entries:[], total:0};
+      byURSMap[k].entries.push(c);
+      byURSMap[k].total += g(c,'ursShare')||0;
+    });
+    const byURS = Object.values(byURSMap);
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="shead"><h2>Document Generation</h2></div>
+      <div class="alert alert-warn" style="margin-bottom:14px;">
+        <strong>How this works:</strong> Clicking "Preview" generates a formatted document replica using live dashboard data.
+        In the deployed system, the equivalent menu item in Google Sheets runs the Apps Script to populate the Google Doc template and export a PDF to Drive.
+      </div>
+      <div class="report-grid">
+        <div class="card report-card">
+          <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;">
+            <div class="report-icon" style="background:linear-gradient(135deg,var(--navyD),var(--navyM));">&#128202;</div>
+            <div>
+              <div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--navy);">FM-RIS-059</div>
+              <div style="font-size:11px;color:var(--muted);">Statistical Services Semestral Report</div>
+            </div>
+          </div>
+          <div class="report-desc">Official semester report for the RISE Center Director. Includes all client records, services rendered, fees collected, and the aggregated 60/40 split.</div>
+          <div class="report-summary">
+            <div class="report-summary-row"><span>Semester/AY:</span><strong>${sem}, AY ${ay}</strong></div>
+            <div class="report-summary-row"><span>Total Records:</span><strong>${clients.length}</strong></div>
+            <div class="report-summary-row"><span>Gross Fees:</span><strong>${peso(g(fin,'grossFees'))}</strong></div>
+            <div class="report-summary-row"><span>URS 60%:</span><strong>${peso(g(fin,'ursHonoraria'))}</strong></div>
+            <div class="report-summary-row"><span>Unit 40%:</span><strong>${peso(g(fin,'unitShare'))}</strong></div>
+          </div>
+          <button class="btn btn-primary" onclick="showReportPreview('059')">&#128438; Preview FM-RIS-059</button>
+          <button class="btn btn-outline" onclick="generateReportDirect('059')" style="margin-top:8px;">&#128462; Generate PDF</button>
+        </div>
+
+        <div class="card report-card">
+          <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;">
+            <div class="report-icon" style="background:linear-gradient(135deg,var(--gold),#E0A840);">&#128179;</div>
+            <div>
+              <div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--navy);">FM-RIS-060</div>
+              <div style="font-size:11px;color:var(--muted);">Requisition for Honoraria of URS</div>
+            </div>
+          </div>
+          <div class="report-desc">Accounting-ready honoraria requisition. Groups paid records by assigned URS, applies the 60% rule, and produces per-URS totals and grand total for Finance Office approval.</div>
+          <div class="report-summary">
+            <div class="report-summary-row"><span>Period:</span><strong>${sem}, AY ${ay}</strong></div>
+            <div class="report-summary-row"><span>Paid Records:</span><strong>${g(fin,'paidCount')}</strong></div>
+            <div class="report-summary-row"><span>Active URS:</span><strong>${byURS.length}</strong></div>
+            <div class="report-summary-row"><span>Grand Honoraria:</span><strong>${peso(g(fin,'ursHonoraria'))}</strong></div>
+          </div>
+          <button class="btn btn-gold" onclick="showReportPreview('060')">&#128438; Preview FM-RIS-060</button>
+          <button class="btn btn-outline" onclick="generateReportDirect('060')" style="margin-top:8px;">&#128462; Generate PDF</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>FM-RIS-060 Data Preview &mdash; Per-URS Breakdown</h3>
+          <span style="font-size:10.5px;color:var(--muted);">Paid records only</span>
+        </div>
+        ${byURS.length === 0 ? '<div class="empty-state">No paid records with assigned URS yet.</div>' :
+          byURS.map(u => `
+          <div>
+            <div class="section-hdr">
+              <span style="font-weight:700;font-size:13px;color:var(--navy);">${u.name}</span>
+              <span style="font-weight:700;color:var(--ok);font-size:13px;">Total: ${peso(u.total)}</span>
+            </div>
+            ${u.entries.map((c,i) => `
+            <div style="padding:7px 18px 7px 32px;font-size:11.5px;border-bottom:1px solid var(--bg);display:flex;justify-content:space-between;align-items:center;background:${i%2===0?'#fff':'var(--bg)'};">
+              <div>
+                <span style="font-weight:700;color:var(--text);">${g(c,'name')||'—'}</span>
+                <span style="color:var(--muted);margin-left:8px;">${g(c,'service')||'—'}</span>
+              </div>
+              <div style="display:flex;gap:16px;align-items:center;">
+                <span style="color:var(--muted);">Fee: ${peso(g(c,'totalFee'))}</span>
+                <span style="font-weight:700;color:var(--ok);">60%: ${peso(g(c,'ursShare'))}</span>
+              </div>
+            </div>`).join('')}
+          </div>`).join('')
+        }
+        <div class="section-footer">
+          <span class="section-footer-total">GRAND TOTAL HONORARIA</span>
+          <span class="section-footer-grand">${peso(g(fin,'ursHonoraria'))}</span>
+        </div>
+      </div>`;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  MODALS
+  // ═══════════════════════════════════════════════════════════
+  function openModal(html) {
+    const root = document.getElementById('modal-root');
+    root.style.display = 'flex';
+    root.innerHTML = html;
+  }
+
+  function closeModal() {
+    document.getElementById('modal-root').style.display = 'none';
+    state.selectedClient = null;
+    state.reportType = null;
+  }
+
+  function showClientModal(c) {
+    state.selectedClient = c;
+    const live60Share = (g(c,'totalFee')||0) * URS_PCT;
+    const live60Unit  = (g(c,'totalFee')||0) * UNIT_PCT;
+    const ursNames = ['', ...state.urs.filter(u => g(u,'status')==='Active').map(u => g(u,'name'))];
+    const today = new Date().toLocaleDateString('en-PH', {year:'numeric',month:'long',day:'numeric'});
+
+    openModal(`
+      <div class="modal-box">
+        <div class="modal-hdr">
+          <div>
+            <div class="modal-hdr-title">${g(c,'id')||'—'}</div>
+            <div class="modal-hdr-sub">${g(c,'name')||'—'} &middot; ${g(c,'department')||'—'}</div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="card card-p" style="background:var(--bg);margin-bottom:18px;">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Research Title</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.55;font-style:italic;">"${g(c,'title')||'—'}"</div>
+            <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+              ${badge(g(c,'category'))}
+              ${g(c,'affiliation') ? badge(g(c,'affiliation')) : '<span style="font-size:10px;color:var(--warn);font-weight:700;background:var(--warnBg);padding:2px 8px;border-radius:3px;border:1px solid rgba(154,98,0,.55);">&#9888; Affiliation not set</span>'}
+              <span style="font-size:11px;color:var(--muted);">Funding: ${g(c,'funding')||'—'}</span>
+            </div>
+          </div>
+
+          <div class="modal-split">
+            <div class="modal-split-label">60 / 40 Split Engine</div>
+            <div class="modal-split-grid">
+              <div><div style="font-size:9.5px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Total Fee</div><div class="modal-split-val" style="color:rgba(255,255,255,.95);">${peso(g(c,'totalFee'))}</div></div>
+              <div><div style="font-size:9.5px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">URS Share (60%)</div><div class="modal-split-val" style="color:var(--goldL);">${peso(live60Share)}</div></div>
+              <div><div style="font-size:9.5px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Unit Share (40%)</div><div class="modal-split-val" style="color:var(--goldL);">${peso(live60Unit)}</div></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="modal-field">
+              <div class="modal-field-label">Official Receipt (OR) Number</div>
+              <input class="fin" id="edit-orNum" value="${g(c,'orNum')||''}" placeholder="e.g. OR-2025-0000"/>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Payment Date</div>
+              <input class="fin" id="edit-payDate" value="${fmtDate(g(c,'payDate'))}" placeholder="MM/DD/YYYY"/>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Payment Status</div>
+              <select class="fin" id="edit-payStatus">
+                ${['Pending','Paid'].map(v => `<option value="${v}" ${g(c,'payStatus')===v?'selected':''}>${v}</option>`).join('')}
+              </select>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Consultation Status</div>
+              <select class="fin" id="edit-status">
+                ${['New','In Progress','Completed','Cancelled'].map(v => `<option value="${v}" ${g(c,'status')===v?'selected':''}>${v}</option>`).join('')}
+              </select>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Affiliation (ISM Officer sets)</div>
+              <div>
+                <select class="fin" id="edit-affiliation">
+                  ${['','SLU','Non-SLU'].map(v => `<option value="${v}" ${g(c,'affiliation')===v?'selected':''}>${v||'— Select —'}</option>`).join('')}
+                </select>
+                <div style="font-size:9.5px;color:var(--muted);margin-top:4px;line-height:1.5;">&#9888; Not from form. If Non-SLU, also adjust Total Fee.</div>
+              </div>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Assigned URS</div>
+              <select class="fin" id="edit-assignedURS">
+                ${ursNames.map(v => `<option value="${v}" ${g(c,'assignedURS')===v?'selected':''}>${v||'— Select —'}</option>`).join('')}
+              </select>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Total Fee (&#8369;) &mdash; adjust for Non-SLU</div>
+              <input class="fin" id="edit-totalFee" type="number" step="0.01" value="${g(c,'totalFee')||0}" placeholder="&#8369;0.00"/>
+            </div>
+            <div class="modal-field">
+              <div class="modal-field-label">Remarks / Notes</div>
+              <input class="fin" id="edit-remarks" value="${g(c,'remarks')||''}" placeholder="Optional notes&middot;&middot;&middot;"/>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-gold" onclick="saveClientEdits(${g(c,'row')})">&#128190; Save Changes to Dashboard</button>
+          </div>
+        </div>
+      </div>`);
+
+    // Auto-update split when fee changes
+    document.getElementById('edit-totalFee').addEventListener('input', function() {
+      const fee = parseFloat(this.value) || 0;
+      const grid = document.querySelector('.modal-split-grid');
+      if (grid) {
+        const cells = grid.querySelectorAll('.modal-split-val');
+        if (cells[1]) cells[1].textContent = peso(fee * URS_PCT);
+        if (cells[2]) cells[2].textContent = peso(fee * UNIT_PCT);
+      }
+    });
+  }
+
+  function saveClientEdits(rowNum) {
+    const updates = {
+      'OR Number':       document.getElementById('edit-orNum').value,
+      'Payment Date':    document.getElementById('edit-payDate').value,
+      'Payment Status':  document.getElementById('edit-payStatus').value,
+      'Status':          document.getElementById('edit-status').value,
+      'Affiliation':     document.getElementById('edit-affiliation').value,
+      'Assigned URS':    document.getElementById('edit-assignedURS').value,
+      'Total Fee (₱)':   parseFloat(document.getElementById('edit-totalFee').value) || 0,
+      'Remarks':         document.getElementById('edit-remarks').value,
+    };
+
+    google.script.run
+      .withSuccessHandler(result => {
+        if (result.success) {
+          updateClientInState(rowNum, updates);
+          toast('Client record updated successfully.');
+          closeModal();
+          renderView();
+        } else {
+          toast('Update failed: ' + result.message, 'err');
+        }
+      })
+      .withFailureHandler(err => {
+        toast('Save failed: ' + err.message, 'err');
+      })
+      .updateClientBatch(rowNum, updates);
+  }
+
+  function showReportPreview(type) {
+    const clients = state.clients;
+    const fin = state.financial;
+    const sem = state.config.sem || 'First Semester';
+    const ay  = state.config.ay  || '2025-2026';
+    const today = fmtFullDate();
+    const is059 = type === '059';
+    const paid = clients.filter(c => g(c,'payStatus') === 'Paid');
+
+    const byURSMap = {};
+    paid.forEach(c => {
+      const k = g(c,'assignedURS') || 'Unassigned';
+      if (!byURSMap[k]) byURSMap[k] = {name:k, entries:[], total:0};
+      byURSMap[k].entries.push(c);
+      byURSMap[k].total += g(c,'ursShare')||0;
+    });
+    const byURS = Object.values(byURSMap);
+
+    const body = is059 ? `
+      <div class="report-letterhead">
+        <div class="report-letterhead-univ">SAINT LOUIS UNIVERSITY</div>
+        <div class="report-letterhead-center">Research, Innovation, and Sustainable Extension Center &middot; 2/F Administrative Center &middot; A. Bonifacio Street, Baguio City 2600</div>
+        <div class="report-letterhead-title">Statistical Services Semestral Report</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">Form No.: FM-RIS-059 &middot; ${sem}, AY ${ay}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:16px;font-size:12px;">
+        <div><strong>Date:</strong> ${today}</div>
+        <div><strong>Semester, AY:</strong> ${sem}, AY ${ay}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;">
+        <thead><tr style="background:var(--navy);color:#fff;">
+          <th style="padding:6px 10px;text-align:left;">Date</th>
+          <th style="padding:6px 10px;text-align:left;">Client</th>
+          <th style="padding:6px 10px;text-align:left;">Service / Fee</th>
+          <th style="padding:6px 10px;text-align:left;">URS</th>
+          <th style="padding:6px 10px;text-align:left;">Remarks</th>
+        </tr></thead>
+        <tbody>
+          ${clients.map((c,i) => `
+          <tr style="background:${i%2===0?'#fff':'#F8FAFF'};">
+            <td style="padding:5px 10px;white-space:nowrap;color:var(--muted);">${fmtDate(g(c,'date'))}</td>
+            <td style="padding:5px 10px;">
+              <div style="font-weight:700;">${g(c,'name')||'—'}</div>
+              <div style="font-size:9.5px;color:var(--muted);">${g(c,'category')||'—'}${g(c,'affiliation') ? ' &middot; ' + g(c,'affiliation') : ''}</div>
+            </td>
+            <td style="padding:5px 10px;">${g(c,'service')||'—'} &middot; ${peso(g(c,'totalFee'))}</td>
+            <td style="padding:5px 10px;font-size:10.5px;">${g(c,'assignedURS')||'—'}</td>
+            <td style="padding:5px 10px;font-size:10.5px;color:var(--muted);">${g(c,'remarks')||'—'}</div></td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:var(--navy);font-weight:700;color:#fff;">
+          <td colspan="2" style="padding:7px 10px;">TOTALS</td>
+          <td style="padding:7px 10px;color:var(--goldL);">${peso(g(fin,'grossFees'))}</td>
+          <td colspan="2"></td>
+        </tr></tfoot>
+      </table>
+      <div style="display:flex;gap:16px;padding:10px 14px;background:#F5F8FF;border-radius:5px;margin-bottom:20px;font-size:11.5px;">
+        <div><strong>Gross Fees:</strong> ${peso(g(fin,'grossFees'))}</div>
+        <div><strong>URS Honoraria (60%):</strong> ${peso(g(fin,'ursHonoraria'))}</div>
+        <div><strong>Unit Share (40%):</strong> ${peso(g(fin,'unitShare'))}</div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin-top:24px;padding-top:16px;border-top:1px solid #ddd;">
+        ${[['Prepared by:', 'ISM Officer'],['Noted by:', 'RISE Center Director']].map(([role,title]) => `
+        <div style="text-align:center;min-width:180px;">
+          <div style="color:var(--muted);font-size:10px;margin-bottom:24px;">${role}</div>
+          <div style="border-bottom:1px solid #555;margin:0 auto 5px;max-width:160px;"></div>
+          <div style="font-weight:700;font-size:11.5px;">${title}</div>
+        </div>`).join('')}
+      </div>` :
+
+    // FM-RIS-060
+    `
+      <div class="report-letterhead">
+        <div class="report-letterhead-univ">SAINT LOUIS UNIVERSITY</div>
+        <div class="report-letterhead-center">Research, Innovation, and Sustainable Extension Center &middot; 2/F Administrative Center &middot; A. Bonifacio Street, Baguio City 2600</div>
+        <div class="report-letterhead-title">Requisition for Honoraria of University Research Statisticians</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">Form No.: FM-RIS-060 &middot; ${sem}, AY ${ay}</div>
+      </div>
+      <p style="margin-bottom:16px;font-size:12px;">Date: ${today}</p>
+      <p style="margin-bottom:8px;font-size:12px;"><strong>To the Finance Office:</strong></p>
+      <p style="margin-bottom:16px;font-size:12px;">May I request for the payment of the honoraria of the following University Research Statisticians for the period of <strong>${sem}, AY ${ay}</strong>:</p>
+      ${byURS.length === 0 ? '<div class="empty-state">No paid records with assigned URS.</div>' :
+        byURS.map((u, ui) => `
+        <div style="margin-bottom:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead><tr style="background:var(--navy);color:#fff;">
+              <th style="padding:6px 10px;width:30px;">${ui+1}.</th>
+              <th style="padding:6px 10px;text-align:left;">Name of URS</th>
+              <th style="padding:6px 10px;text-align:left;">Client Name</th>
+              <th style="padding:6px 10px;text-align:left;">Service / Fee</th>
+              <th style="padding:6px 10px;text-align:right;">Amount Due</th>
+            </tr></thead>
+            <tbody>
+              ${u.entries.map((c,i) => `
+              <tr style="background:${i%2===0?'#fff':'#F8FAFF'};">
+                <td style="padding:5px 10px;">${i===0?`${ui+1}.`:''}</td>
+                <td style="padding:5px 10px;font-weight:${i===0?700:400};">${i===0?u.name:''}</td>
+                <td style="padding:5px 10px;">${g(c,'name')||'—'}</td>
+                <td style="padding:5px 10px;">${g(c,'service')||'—'} &mdash; ${peso(g(c,'totalFee'))}</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:700;color:var(--ok);">${peso(g(c,'ursShare'))}</td>
+              </tr>`).join('')}
+              <tr style="background:#EEF2FA;font-weight:700;">
+                <td colspan="4" style="padding:6px 10px;text-align:right;color:var(--navy);">Total amount due:</td>
+                <td style="padding:6px 10px;text-align:right;color:var(--navy);">${peso(u.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`).join('')
+      }
+      <div style="background:var(--navyD);color:#fff;padding:9px 16px;border-radius:5px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:20px;">
+        <span>GRAND TOTAL HONORARIA:</span>
+        <span style="color:var(--goldL);font-family:'Playfair Display',serif;">${peso(g(fin,'ursHonoraria'))}</span>
+      </div>
+      <p style="font-size:11.5px;line-height:1.7;margin-bottom:20px;font-style:italic;color:var(--muted);">I attest that the above-listed University Research Statisticians have rendered their services satisfactorily. Thank you very much.</p>
+      <div style="display:flex;justify-content:space-around;margin-top:24px;padding-top:16px;border-top:1px solid #ddd;">
+        ${[['Prepared by:', 'ISM Officer'],['Noted by:', 'RISE Center Director']].map(([role,title]) => `
+        <div style="text-align:center;min-width:180px;">
+          <div style="color:var(--muted);font-size:10px;margin-bottom:24px;">${role}</div>
+          <div style="border-bottom:1px solid #555;margin:0 auto 5px;max-width:160px;"></div>
+          <div style="font-weight:700;font-size:11.5px;">${title}</div>
+        </div>`).join('')}
+      </div>
+      <div style="text-align:center;margin-top:20px;">
+        <div style="color:var(--muted);font-size:10px;margin-bottom:24px;">Approved for release:</div>
+        <div style="border-bottom:1px solid #555;margin:0 auto 6px;max-width:220px;"></div>
+        <div style="font-weight:700;font-size:11.5px;">Vice President for Finance</div>
+      </div>`;
+
+    openModal(`
+      <div class="report-modal-box">
+        <div class="report-modal-hdr">
+          <div>
+            <div style="font-family:'Playfair Display',serif;color:var(--gold);font-size:14px;font-weight:700;">
+              ${is059 ? 'FM-RIS-059 — Statistical Services Semestral Report' : 'FM-RIS-060 — Requisition for Honoraria of URS'}
+            </div>
+            <div style="color:rgba(255,255,255,.55);font-size:10px;margin-top:2px;">Document Preview &middot; ${sem}, AY ${ay}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="background:var(--warnBg);color:var(--warn);font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;">&#128203; PREVIEW</div>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+          </div>
+        </div>
+        <div class="report-modal-body">
+          ${body}
+          <div style="margin-top:20px;font-size:9.5px;color:var(--muted);text-align:center;border-top:1px dashed #ccc;padding-top:10px;">
+            Generated by ISRM Digital Operations Suite &middot; Saint Louis University &middot; The Apps Script equivalent converts this preview into a PDF saved to Google Drive.
+          </div>
+        </div>
+      </div>`);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  EVENT HANDLERS
+  // ═══════════════════════════════════════════════════════════
+  function attachActivityHandlers() {
+    document.querySelectorAll('.dash-activity-item, .dash-pending-item').forEach(el => {
+      el.addEventListener('click', function() {
+        try {
+          const data = JSON.parse(this.dataset.client.replace(/&#39;/g, "'"));
+          showClientModal(data);
+        } catch(e) { toast('Could not open client record.', 'err'); }
+      });
+    });
+  }
+
+  function attachClientsTableHandlers() {
+    document.querySelectorAll('table.tbl tbody tr').forEach(el => {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.btn')) return;
+        try {
+          const data = JSON.parse(this.dataset.client.replace(/&#39;/g, "'"));
+          showClientModal(data);
+        } catch(e) { toast('Could not open client record.', 'err'); }
+      });
+    });
+
+    const searchQ = document.getElementById('search-q');
+    if (searchQ) {
+      searchQ.addEventListener('input', debounce(() => {
+        state.searchQ = searchQ.value;
+        renderClients();
+      }, 300));
+    }
+
+    const filterPay = document.getElementById('filter-pay');
+    if (filterPay) filterPay.addEventListener('change', () => { state.filterPay = filterPay.value; renderClients(); });
+
+    const filterStat = document.getElementById('filter-stat');
+    if (filterStat) filterStat.addEventListener('change', () => { state.filterStat = filterStat.value; renderClients(); });
+
+    const filterURS = document.getElementById('filter-urs');
+    if (filterURS) filterURS.addEventListener('change', () => { state.filterURS = filterURS.value; renderClients(); });
+
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      state.searchQ = ''; state.filterPay = 'All'; state.filterStat = 'All'; state.filterURS = 'All';
+      renderClients();
+    });
+  }
+
+  function debounce(fn, delay) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+  }
+
+  function generateReportDirect(type) {
+    const period = (state.config.sem || 'First Semester') + ' AY ' + (state.config.ay || '2025-2026');
+    const reportType = type === '059' ? 'FM-RIS-059' : 'FM-RIS-060';
+    const reportName = type === '059' ? 'Semestral Report' : 'Honoraria Requisition';
+
+    google.script.run
+      .withSuccessHandler(result => {
+        if (result.success && result.url) {
+          toast('Report generated successfully! Opening...', 'ok');
+          window.open(result.url, '_blank');
+        } else {
+          toast('Generation failed: ' + (result.message || 'Unknown error'), 'err');
+        }
+      })
+      .withFailureHandler(err => {
+        toast('Error: ' + err.message, 'err');
+      })
+      .generateReportDirect(type === '059' ? 'FM-RIS-059' : 'FM-RIS-060', period);
+  }
+
+  function escHtml(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function switchView(view) {
+    state.view = view;
+    renderView();
+  }
+
+  // ── NAV ──────────────────────────────────────────────────
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  // ── MODAL OVERLAY CLICK-TO-CLOSE ──────────────────────────
+  document.getElementById('modal-root').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  INIT
+  // ═══════════════════════════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+</body>
+</html>
