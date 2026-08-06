@@ -2,7 +2,8 @@
 import {
   Activity, Users, FileText, FolderOpen, Lock, LogOut,
   CheckCircle, Clock, AlertCircle, RefreshCw,
-  Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell
+  Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 
 // ============================================================================
@@ -24,10 +25,10 @@ interface Client {
   'Research Objectives': string;
   'Research Questions': string;
   'Service Type': string;
-  'Total Fee (P)': number;
+  'Total Fee (\u20B1)': number;
   'Payment Status': string;
   'Assigned URS': string;
-  'URS Share 60% (P)': number;
+  'URS Share 60% (\u20B1)': number;
   'Status': string;
   'Remarks': string;
   'Drive Folder URL': string;
@@ -178,8 +179,8 @@ function LoginPage({ onLogin }: { onLogin: (name: string, email: string) => void
       <div className="relative w-full max-w-md">
         <Card className="p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-navy flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Activity size={28} className="text-gold" />
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/40 mx-auto mb-4 shadow-lg">
+              <img src="/slu-logo.png" alt="SLU" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl font-bold text-navy font-playfair">URS Portal</h1>
             <p className="text-slate-500 text-sm mt-1">ISRM &mdash; Saint Louis University</p>
@@ -229,7 +230,7 @@ function DashboardOverview({ ursName, myClients, profile }: { ursName: string; m
   const completed  = myClients.filter(c => c['Status'] === 'Completed');
   const newOnes    = myClients.filter(c => c['Status'] === 'New');
   const totalEarnings = myClients.filter(c => c['Payment Status'] === 'Paid')
-    .reduce((s, c) => s + (Number(c['URS Share 60% (P)']) || 0), 0);
+    .reduce((s, c) => s + (Number(c['URS Share 60% (\u20B1)']) || 0), 0);
 
   const overdue = myClients.filter(c => {
     if (c['Status'] !== 'In Progress' || !c['Deadline Date']) return false;
@@ -408,7 +409,7 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                       )}
                     </div>
                     <p className="font-semibold text-navy text-sm">{c['Client Name']}</p>
-                    <p className="text-slate-500 text-xs">{c['Service Type']} &bull; {c['Department/School'] || '—'}</p>
+                    <p className="text-slate-500 text-xs">{c['Service Type']} • {c['Department/School'] || '—'}</p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     {!isEditing && (
@@ -465,8 +466,8 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
                       <div><span className="text-xs font-bold text-slate-400 uppercase">Research Title</span><p className="text-slate-700 mt-0.5">{c['Research Title'] || '—'}</p></div>
                       <div><span className="text-xs font-bold text-slate-400 uppercase">Payment</span><p className={`mt-0.5 font-semibold ${c['Payment Status'] === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>{c['Payment Status'] || '—'}</p></div>
-                      <div><span className="text-xs font-bold text-slate-400 uppercase">Total Fee</span><p className="text-navy font-bold mt-0.5">&#8369;{(Number(c['Total Fee (P)']) || 0).toLocaleString()}</p></div>
-                      <div><span className="text-xs font-bold text-slate-400 uppercase">Your Share (60%)</span><p className="text-gold font-bold mt-0.5">&#8369;{(Number(c['URS Share 60% (P)']) || 0).toLocaleString()}</p></div>
+                      <div><span className="text-xs font-bold text-slate-400 uppercase">Total Fee</span><p className="text-navy font-bold mt-0.5">&#8369;{(Number(c['Total Fee (\u20B1)']) || 0).toLocaleString()}</p></div>
+                      <div><span className="text-xs font-bold text-slate-400 uppercase">Your Share (60%)</span><p className="text-gold font-bold mt-0.5">&#8369;{(Number(c['URS Share 60% (\u20B1)']) || 0).toLocaleString()}</p></div>
                       {c['In Progress Date'] && <div><span className="text-xs font-bold text-slate-400 uppercase">Started</span><p className="text-slate-700 mt-0.5">{formatDate(c['In Progress Date'])}</p></div>}
                       {c['Deadline Date'] && <div><span className="text-xs font-bold text-slate-400 uppercase">Deadline</span><p className="text-slate-700 mt-0.5">{formatDate(c['Deadline Date'])}</p></div>}
                     </div>
@@ -535,7 +536,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
     <div className="space-y-4">
       <SectionHeader
         title="All Clients"
-        subtitle={`${unassigned.length} unassigned client${unassigned.length !== 1 ? 's' : ''} available &bull; ${allClients.length} total`}
+        subtitle={`${unassigned.length} unassigned client${unassigned.length !== 1 ? 's' : ''} available • ${allClients.length} total`}
         action={
           <button onClick={onRefresh} className="flex items-center gap-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
             <RefreshCw size={12} /> Refresh
@@ -584,7 +585,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                       {isUnassigned && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">Unassigned</span>}
                     </div>
                     <p className="font-semibold text-navy text-sm">{c['Client Name']}</p>
-                    <p className="text-slate-500 text-xs">{c['Service Type']} &bull; {c['Department/School'] || '—'}</p>
+                    <p className="text-slate-500 text-xs">{c['Service Type']} • {c['Department/School'] || '—'}</p>
                     {!isUnassigned && !isMyClient && <p className="text-slate-400 text-xs mt-0.5">Assigned to: {c['Assigned URS']}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -906,8 +907,8 @@ function DashboardShell({ ursName, email, onLogout }: { ursName: string; email: 
           <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden p-1.5 rounded-lg hover:bg-white/10">
             <Menu size={20} />
           </button>
-          <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center">
-            <Activity size={16} className="text-gold" />
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-gold/40 flex-shrink-0">
+            <img src="/slu-logo.png" alt="SLU" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="text-sm font-bold tracking-wide">ISRM URS Portal</div>
