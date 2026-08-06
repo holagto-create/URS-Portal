@@ -575,7 +575,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
             const isUnassigned = !c['Assigned URS'] || c['Assigned URS'].trim() === '';
             const isMyClient = (c['Assigned URS'] || '').toLowerCase() === ursName.toLowerCase();
             return (
-              <Card key={c['Record ID']} className={`overflow-hidden ${isMyClient ? 'border-gold/50' : ''}`}>
+              <Card key={c['Record ID']} className={`overflow-hidden ${isMyClient ? 'border-gold/50' : ''} ${isUnassigned ? 'border-l-4 border-l-teal-500' : ''}`}>
                 <div className="px-5 py-4 flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -593,7 +593,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                       <button
                         onClick={() => handleExpressInterest(c)}
                         disabled={sending && interestId === c['Record ID']}
-                        className="px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all">
+                        className="px-4 py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all shadow-sm whitespace-nowrap">
                         {sending && interestId === c['Record ID'] ? 'Sending...' : 'Express Interest'}
                       </button>
                     )}
@@ -622,7 +622,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                       <button
                         onClick={() => handleExpressInterest(c)}
                         disabled={sending && interestId === c['Record ID']}
-                        className="mt-2 w-full py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                        className="mt-3 w-full py-4 bg-teal-600 text-white text-base font-bold rounded-xl hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md">
                         {sending && interestId === c['Record ID'] ? 'Sending notification to Officer...': '✉ Express Interest — Notify Officer'}
                       </button>
                     )}
