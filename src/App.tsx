@@ -24,10 +24,10 @@ interface Client {
   'Research Objectives': string;
   'Research Questions': string;
   'Service Type': string;
-  'Total Fee (P)': number;
+  'Total Fee (\u20B1)': number;
   'Payment Status': string;
   'Assigned URS': string;
-  'URS Share 60% (P)': number;
+  'URS Share 60% (\u20B1)': number;
   'Status': string;
   'Remarks': string;
   'Drive Folder URL': string;
@@ -229,7 +229,7 @@ function DashboardOverview({ ursName, myClients, profile }: { ursName: string; m
   const completed  = myClients.filter(c => c['Status'] === 'Completed');
   const newOnes    = myClients.filter(c => c['Status'] === 'New');
   const totalEarnings = myClients.filter(c => c['Payment Status'] === 'Paid')
-    .reduce((s, c) => s + (Number(c['URS Share 60% (P)']) || 0), 0);
+    .reduce((s, c) => s + (Number(c['URS Share 60% (\u20B1)']) || 0), 0);
 
   const overdue = myClients.filter(c => {
     if (c['Status'] !== 'In Progress' || !c['Deadline Date']) return false;
@@ -465,8 +465,8 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
                       <div><span className="text-xs font-bold text-slate-400 uppercase">Research Title</span><p className="text-slate-700 mt-0.5">{c['Research Title'] || '—'}</p></div>
                       <div><span className="text-xs font-bold text-slate-400 uppercase">Payment</span><p className={`mt-0.5 font-semibold ${c['Payment Status'] === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>{c['Payment Status'] || '—'}</p></div>
-                      <div><span className="text-xs font-bold text-slate-400 uppercase">Total Fee</span><p className="text-navy font-bold mt-0.5">&#8369;{(Number(c['Total Fee (P)']) || 0).toLocaleString()}</p></div>
-                      <div><span className="text-xs font-bold text-slate-400 uppercase">Your Share (60%)</span><p className="text-gold font-bold mt-0.5">&#8369;{(Number(c['URS Share 60% (P)']) || 0).toLocaleString()}</p></div>
+                      <div><span className="text-xs font-bold text-slate-400 uppercase">Total Fee</span><p className="text-navy font-bold mt-0.5">&#8369;{(Number(c['Total Fee (\u20B1)']) || 0).toLocaleString()}</p></div>
+                      <div><span className="text-xs font-bold text-slate-400 uppercase">Your Share (60%)</span><p className="text-gold font-bold mt-0.5">&#8369;{(Number(c['URS Share 60% (\u20B1)']) || 0).toLocaleString()}</p></div>
                       {c['In Progress Date'] && <div><span className="text-xs font-bold text-slate-400 uppercase">Started</span><p className="text-slate-700 mt-0.5">{formatDate(c['In Progress Date'])}</p></div>}
                       {c['Deadline Date'] && <div><span className="text-xs font-bold text-slate-400 uppercase">Deadline</span><p className="text-slate-700 mt-0.5">{formatDate(c['Deadline Date'])}</p></div>}
                     </div>
