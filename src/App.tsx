@@ -409,7 +409,7 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                       )}
                     </div>
                     <p className="font-semibold text-navy text-sm">{c['Client Name']}</p>
-                    <p className="text-slate-500 text-xs">{c['Service Type']} &bull; {c['Department/School'] || '—'}</p>
+                    <p className="text-slate-500 text-xs">{c['Service Type']} • {c['Department/School'] || '—'}</p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     {!isEditing && (
@@ -536,7 +536,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
     <div className="space-y-4">
       <SectionHeader
         title="All Clients"
-        subtitle={`${unassigned.length} unassigned client${unassigned.length !== 1 ? 's' : ''} available &bull; ${allClients.length} total`}
+        subtitle={`${unassigned.length} unassigned client${unassigned.length !== 1 ? 's' : ''} available • ${allClients.length} total`}
         action={
           <button onClick={onRefresh} className="flex items-center gap-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
             <RefreshCw size={12} /> Refresh
@@ -585,7 +585,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                       {isUnassigned && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">Unassigned</span>}
                     </div>
                     <p className="font-semibold text-navy text-sm">{c['Client Name']}</p>
-                    <p className="text-slate-500 text-xs">{c['Service Type']} &bull; {c['Department/School'] || '—'}</p>
+                    <p className="text-slate-500 text-xs">{c['Service Type']} • {c['Department/School'] || '—'}</p>
                     {!isUnassigned && !isMyClient && <p className="text-slate-400 text-xs mt-0.5">Assigned to: {c['Assigned URS']}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
