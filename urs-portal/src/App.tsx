@@ -618,6 +618,14 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                         <FolderOpen size={14} /> View Research Files
                       </a>
                     )}
+                    {isUnassigned && (
+                      <button
+                        onClick={() => handleExpressInterest(c)}
+                        disabled={sending && interestId === c['Record ID']}
+                        className="mt-2 w-full py-2 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                        {sending && interestId === c['Record ID'] ? 'Sending notification to Officer...': '✉ Express Interest — Notify Officer'}
+                      </button>
+                    )}
                   </div>
                 )}
               </Card>
