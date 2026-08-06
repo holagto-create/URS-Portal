@@ -179,8 +179,8 @@ function LoginPage({ onLogin }: { onLogin: (name: string, email: string) => void
       <div className="relative w-full max-w-md">
         <Card className="p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-navy flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Activity size={28} className="text-gold" />
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/40 mx-auto mb-4 shadow-lg">
+              <img src="/slu-logo.png" alt="SLU" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-2xl font-bold text-navy font-playfair">URS Portal</h1>
             <p className="text-slate-500 text-sm mt-1">ISRM &mdash; Saint Louis University</p>
@@ -907,8 +907,8 @@ function DashboardShell({ ursName, email, onLogout }: { ursName: string; email: 
           <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden p-1.5 rounded-lg hover:bg-white/10">
             <Menu size={20} />
           </button>
-          <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center">
-            <Activity size={16} className="text-gold" />
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-gold/40 flex-shrink-0">
+            <img src="/slu-logo.png" alt="SLU" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="text-sm font-bold tracking-wide">ISRM URS Portal</div>
