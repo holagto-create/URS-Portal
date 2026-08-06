@@ -2,7 +2,8 @@
 import {
   Activity, Users, FileText, FolderOpen, Lock, LogOut,
   CheckCircle, Clock, AlertCircle, RefreshCw,
-  Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell
+  Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 
 // ============================================================================
