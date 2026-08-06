@@ -622,7 +622,7 @@ function AllClientsSection({ ursName, allClients, onRefresh, showToast }:
                       <button
                         onClick={() => handleExpressInterest(c)}
                         disabled={sending && interestId === c['Record ID']}
-                        className="mt-3 w-full py-4 bg-teal-600 text-white text-base font-bold rounded-xl hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md">
+                        style={{ backgroundColor: '#0d9488', color: '#ffffff' }} className="mt-3 w-full py-4 text-base font-bold rounded-xl disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md hover:opacity-90">
                         {sending && interestId === c['Record ID'] ? 'Sending notification to Officer...': '✉ Express Interest — Notify Officer'}
                       </button>
                     )}
