@@ -44,20 +44,28 @@ type Section = 'dashboard' | 'my-clients' | 'all-clients' | 'availability' | 'pa
 // ============================================================================
 // API HELPERS
 // ============================================================================
+const TOKEN_KEY = 'ursSessionToken';
+function getStoredToken(): string { return sessionStorage.getItem(TOKEN_KEY) || ''; }
+function setStoredToken(token: string) { sessionStorage.setItem(TOKEN_KEY, token); }
+function clearStoredToken() { sessionStorage.removeItem(TOKEN_KEY); }
+
 async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(SCRIPT_URL);
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const token = getStoredToken();
+  if (token && !('token' in params)) url.searchParams.set('token', token);
   const res = await fetch(url.toString(), { redirect: 'follow' });
   const text = await res.text();
   try { return JSON.parse(text); } catch { throw new Error('Parse error: ' + text.substring(0, 120)); }
 }
 
 async function apiPost<T>(body: Record<string, unknown>): Promise<T> {
+  const payload = ('token' in body) ? body : { ...body, token: getStoredToken() };
   const res = await fetch(SCRIPT_URL, {
     method: 'POST', redirect: 'follow',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
   const text = await res.text();
   try { return JSON.parse(text); } catch { throw new Error('Parse error: ' + text.substring(0, 120)); }
@@ -147,7 +155,7 @@ function SectionHeader({ title, subtitle, action }: { title: string; subtitle?: 
 // ============================================================================
 // LOGIN PAGE
 // ============================================================================
-function LoginPage({ onLogin }: { onLogin: (name: string, email: string) => void }) {
+function LoginPage({ onLogin }: { onLogin: (name: string, email: string, token: string) => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -160,11 +168,13 @@ function LoginPage({ onLogin }: { onLogin: (name: string, email: string) => void
     if (!name.trim() || !email.trim() || !password.trim()) { setError('All fields are required.'); return; }
     setLoading(true); setError('');
     try {
-      const res = await apiGet<{ success: boolean; valid: boolean; name?: string; message?: string }>(
-        'validateURSCredentials', { name: name.trim(), email: email.trim(), password: password.trim() }
+      const res = await apiPost<{ success: boolean; valid: boolean; name?: string; token?: string; requiresSetup?: boolean; message?: string }>(
+        { action: 'validateURSCredentials', name: name.trim(), email: email.trim(), password: password.trim() }
       );
       if (res.success && res.valid) {
-        onLogin(res.name || name.trim(), email.trim());
+        onLogin(res.name || name.trim(), email.trim(), res.token || '');
+      } else if (res.requiresSetup) {
+        setError(res.message || 'No password has been set for this account yet. Contact the ISRM Officer.');
       } else {
         setError(res.message || 'Incorrect credentials. Please check your name, email, and password.');
       }
@@ -997,19 +1007,23 @@ function DashboardShell({ ursName, email, onLogout }: { ursName: string; email: 
 // ROOT APP
 // ============================================================================
 export default function App() {
-  const [ursName, setUrsName] = useState<string>(() => sessionStorage.getItem('ursName') || '');
-  const [email,   setEmail]   = useState<string>(() => sessionStorage.getItem('ursEmail') || '');
+  // A stored name with no session token means the token expired or was never
+  // issued (e.g. left over from before this session-auth change) — treat as logged out.
+  const [ursName, setUrsName] = useState<string>(() => (getStoredToken() ? sessionStorage.getItem('ursName') || '' : ''));
+  const [email,   setEmail]   = useState<string>(() => (getStoredToken() ? sessionStorage.getItem('ursEmail') || '' : ''));
 
-  const handleLogin = (name: string, mail: string) => {
+  const handleLogin = (name: string, mail: string, token: string) => {
     setUrsName(name); setEmail(mail);
     sessionStorage.setItem('ursName',  name);
     sessionStorage.setItem('ursEmail', mail);
+    setStoredToken(token);
   };
 
   const handleLogout = () => {
     setUrsName(''); setEmail('');
     sessionStorage.removeItem('ursName');
     sessionStorage.removeItem('ursEmail');
+    clearStoredToken();
   };
 
   return ursName
