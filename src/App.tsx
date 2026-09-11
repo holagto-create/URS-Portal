@@ -43,7 +43,9 @@ interface Toast { message: string; type: 'success' | 'error' | 'info'; }
 type Section = 'dashboard' | 'my-clients' | 'all-clients' | 'availability' | 'password';
 
 // v12: File uploads (Manuscript / Data Gathering Tool / Data Files / Others)
-const UPLOAD_SUBFOLDERS = ['Manuscript', 'Data Gathering Tool', 'Data Files', 'Others'] as const;
+// The assigned URS delivers the finished output into this single
+// dedicated subfolder — matches URS_UPLOAD_SUBFOLDERS on the backend.
+const UPLOAD_SUBFOLDERS = ['Analysis and Results'] as const;
 type UploadSubfolder = typeof UPLOAD_SUBFOLDERS[number];
 const MAX_UPLOAD_MB = 10;
 interface UploadedFile {
@@ -366,7 +368,7 @@ function DashboardOverview({ ursName, myClients, profile }: { ursName: string; m
 function URSFileUploadSection({ recordId, ursName }: { recordId: string; ursName: string }) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
-  const [subfolder, setSubfolder] = useState<UploadSubfolder>(UPLOAD_SUBFOLDERS[0]);
+  const subfolder: UploadSubfolder = UPLOAD_SUBFOLDERS[0];
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -452,10 +454,9 @@ function URSFileUploadSection({ recordId, ursName }: { recordId: string; ursName
       )}
 
       <div className="flex flex-wrap items-center gap-2 mt-1.5">
-        <select value={subfolder} onChange={e => setSubfolder(e.target.value as UploadSubfolder)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
-          {UPLOAD_SUBFOLDERS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <span className="text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5">
+          Uploading to: <span className="font-semibold text-slate-700">{subfolder}</span>
+        </span>
         <input id={`urs-file-input-${recordId}`} type="file"
           onChange={e => setSelectedFile(e.target.files?.[0] || null)}
           className="text-sm text-slate-600 max-w-[220px]" />
