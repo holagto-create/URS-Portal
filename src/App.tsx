@@ -3,7 +3,7 @@ import {
   Activity, Users, FileText, FolderOpen, Lock, LogOut,
   CheckCircle, Clock, AlertCircle, RefreshCw,
   Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Upload
 } from 'lucide-react';
 
 // ============================================================================
@@ -41,12 +41,43 @@ interface URSProfile {
 }
 interface Toast { message: string; type: 'success' | 'error' | 'info'; }
 type Section = 'dashboard' | 'my-clients' | 'all-clients' | 'availability' | 'password';
+
+// v12: File uploads (Manuscript / Data Gathering Tool / Data Files / Others)
+const UPLOAD_SUBFOLDERS = ['Manuscript', 'Data Gathering Tool', 'Data Files', 'Others'] as const;
+type UploadSubfolder = typeof UPLOAD_SUBFOLDERS[number];
+const MAX_UPLOAD_MB = 10;
+interface UploadedFile {
+  logId: string; recordId: string; fileName: string; fileUrl: string; fileId: string;
+  subfolder: string; uploadedByRole: string; uploadedBy: string; uploadDate: string;
+  acknowledged: boolean; acknowledgedBy?: string; acknowledgedDate?: string; notes?: string;
+}
+// ============================================================================
+// SESSION TOKEN
+// ============================================================================
+// Set after a successful validateURSCredentials call; every subsequent API
+// call attaches it automatically. Cleared on logout.
+const TOKEN_KEY = 'ursSessionToken';
+
+function getStoredToken(): string {
+  try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+}
+
+function setStoredToken(token: string): void {
+  try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* storage unavailable — session just won't persist */ }
+}
+
+function clearStoredToken(): void {
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+
 // ============================================================================
 // API HELPERS
 // ============================================================================
 async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(SCRIPT_URL);
   url.searchParams.set('action', action);
+  const token = getStoredToken();
+  if (token) url.searchParams.set('token', token);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString(), { redirect: 'follow' });
   const text = await res.text();
@@ -54,13 +85,27 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
 }
 
 async function apiPost<T>(body: Record<string, unknown>): Promise<T> {
+  const fullBody = ('token' in body) ? body : { ...body, token: getStoredToken() };
   const res = await fetch(SCRIPT_URL, {
     method: 'POST', redirect: 'follow',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(fullBody),
   });
   const text = await res.text();
   try { return JSON.parse(text); } catch { throw new Error('Parse error: ' + text.substring(0, 120)); }
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const commaIdx = result.indexOf(',');
+      resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 // ============================================================================
@@ -160,11 +205,16 @@ function LoginPage({ onLogin }: { onLogin: (name: string, email: string) => void
     if (!name.trim() || !email.trim() || !password.trim()) { setError('All fields are required.'); return; }
     setLoading(true); setError('');
     try {
-      const res = await apiGet<{ success: boolean; valid: boolean; name?: string; message?: string }>(
-        'validateURSCredentials', { name: name.trim(), email: email.trim(), password: password.trim() }
+      // Sent as POST so the password never travels in a URL, a server log,
+      // or browser history.
+      const res = await apiPost<{ success: boolean; valid: boolean; name?: string; message?: string; token?: string; requiresSetup?: boolean }>(
+        { action: 'validateURSCredentials', name: name.trim(), email: email.trim(), password: password.trim() }
       );
       if (res.success && res.valid) {
+        if (res.token) setStoredToken(res.token);
         onLogin(res.name || name.trim(), email.trim());
+      } else if (res.requiresSetup) {
+        setError(res.message || 'Your account has no password set yet. Please contact the ISRM Officer.');
       } else {
         setError(res.message || 'Incorrect credentials. Please check your name, email, and password.');
       }
@@ -310,6 +360,121 @@ function DashboardOverview({ ursName, myClients, profile }: { ursName: string; m
     </div>
   );
 }
+// ============================================================================
+// URS FILE UPLOAD SECTION
+// ============================================================================
+function URSFileUploadSection({ recordId, ursName }: { recordId: string; ursName: string }) {
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(true);
+  const [subfolder, setSubfolder] = useState<UploadSubfolder>(UPLOAD_SUBFOLDERS[0]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadFiles = async () => {
+    setLoadingFiles(true);
+    try {
+      const res = await apiGet<{ success: boolean; files?: UploadedFile[] }>('getRequestFiles', { recordId });
+      if (res.success) setFiles(res.files || []);
+    } catch {
+      // File list is a convenience; a failed fetch here shouldn't block the rest of the card.
+    } finally {
+      setLoadingFiles(false);
+    }
+  };
+
+  useEffect(() => { loadFiles(); }, [recordId]);
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    if (selectedFile.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setMessage({ type: 'error', text: `File is too large. Maximum size is ${MAX_UPLOAD_MB} MB.` });
+      return;
+    }
+    setUploading(true);
+    setMessage(null);
+    try {
+      const fileData = await fileToBase64(selectedFile);
+      const res = await apiPost<{ success: boolean; message?: string }>({
+        action: 'uploadURSFile', recordId, ursName, subfolder,
+        fileName: selectedFile.name, mimeType: selectedFile.type || 'application/octet-stream', fileData,
+      });
+      if (res.success) {
+        setMessage({ type: 'success', text: 'File uploaded successfully.' });
+        setSelectedFile(null);
+        const input = document.getElementById(`urs-file-input-${recordId}`) as HTMLInputElement | null;
+        if (input) input.value = '';
+        await loadFiles();
+      } else {
+        setMessage({ type: 'error', text: res.message || 'Upload failed.' });
+      }
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Upload failed.' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="pt-2 mt-2 border-t border-slate-100">
+      <span className="text-xs font-bold text-slate-400 uppercase">Files for this request</span>
+
+      {loadingFiles && <p className="text-sm text-slate-400 mt-1.5">Loading files…</p>}
+
+      {!loadingFiles && files.length === 0 && (
+        <p className="text-sm text-slate-400 mt-1.5">No files uploaded yet.</p>
+      )}
+
+      {!loadingFiles && files.length > 0 && (
+        <ul className="space-y-1.5 mt-1.5 mb-2">
+          {files.map(f => (
+            <li key={f.logId} className="flex flex-wrap items-center justify-between gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+              <a href={f.fileUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-teal-700 underline truncate">
+                <FileText size={14} className="shrink-0" />
+                <span className="truncate">{f.fileName}</span>
+              </a>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-slate-400">{f.subfolder}</span>
+                {f.acknowledged ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    <CheckCircle size={12} /> Acknowledged
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    <Clock size={12} /> Pending review
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+        <select value={subfolder} onChange={e => setSubfolder(e.target.value as UploadSubfolder)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+          {UPLOAD_SUBFOLDERS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input id={`urs-file-input-${recordId}`} type="file"
+          onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+          className="text-sm text-slate-600 max-w-[220px]" />
+        <button onClick={handleUpload} disabled={!selectedFile || uploading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <Upload size={13} /> {uploading ? 'Uploading...' : 'Upload'}
+        </button>
+      </div>
+      <p className="text-xs text-slate-400 mt-1">Max {MAX_UPLOAD_MB} MB per file.</p>
+
+      {message && (
+        <p className={`text-sm mt-2 ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // MY CLIENTS SECTION
 // ============================================================================
@@ -480,6 +645,7 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                         <FolderOpen size={14} /> Open Research Files
                       </a>
                     )}
+                    <URSFileUploadSection recordId={c['Record ID']} ursName={ursName} />
                   </div>
                 )}
               </Card>
@@ -997,8 +1163,14 @@ function DashboardShell({ ursName, email, onLogout }: { ursName: string; email: 
 // ROOT APP
 // ============================================================================
 export default function App() {
-  const [ursName, setUrsName] = useState<string>(() => sessionStorage.getItem('ursName') || '');
-  const [email,   setEmail]   = useState<string>(() => sessionStorage.getItem('ursEmail') || '');
+  // A stored name with no session token is a stale/cleared session — treat
+  // it as logged out rather than rendering the dashboard.
+  const [ursName, setUrsName] = useState<string>(() =>
+    getStoredToken() ? (sessionStorage.getItem('ursName') || '') : ''
+  );
+  const [email,   setEmail]   = useState<string>(() =>
+    getStoredToken() ? (sessionStorage.getItem('ursEmail') || '') : ''
+  );
 
   const handleLogin = (name: string, mail: string) => {
     setUrsName(name); setEmail(mail);
@@ -1010,6 +1182,7 @@ export default function App() {
     setUrsName(''); setEmail('');
     sessionStorage.removeItem('ursName');
     sessionStorage.removeItem('ursEmail');
+    clearStoredToken();
   };
 
   return ursName
