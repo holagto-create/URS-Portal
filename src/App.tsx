@@ -88,7 +88,7 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
   const token = getStoredToken();
   if (token) url.searchParams.set('token', token);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { redirect: 'follow' });
+  const res = await fetch(url.toString(), { redirect: 'follow', cache: 'no-store' });
   const text = await res.text();
   try { return JSON.parse(text); } catch { throw new Error('Parse error: ' + text.substring(0, 120)); }
 }
@@ -489,19 +489,25 @@ function URSMessagesSection({ recordId, ursName }: { recordId: string; ursName: 
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
 
-  const loadMessages = async () => {
-    setLoadingMessages(true);
+  const loadMessages = async (silent = false) => {
+    if (!silent) setLoadingMessages(true);
     try {
       const res = await apiGet<{ success: boolean; messages?: RequestMessage[] }>('getRequestMessages', { recordId });
       if (res.success) setMessages(res.messages || []);
     } catch {
       // Messages are a convenience; a failed fetch here shouldn't block the rest of the card.
     } finally {
-      setLoadingMessages(false);
+      if (!silent) setLoadingMessages(false);
     }
   };
 
-  useEffect(() => { loadMessages(); }, [recordId]);
+  useEffect(() => {
+    loadMessages();
+    // Poll for new messages from the client so the thread updates on its
+    // own — no manual refresh should ever be required to see one.
+    const interval = setInterval(() => loadMessages(true), 15000);
+    return () => clearInterval(interval);
+  }, [recordId]);
 
   const handleSend = async () => {
     const text = draft.trim();
