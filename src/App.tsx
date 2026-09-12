@@ -3,7 +3,7 @@ import {
   Activity, Users, FileText, FolderOpen, Lock, LogOut,
   CheckCircle, Clock, AlertCircle, RefreshCw,
   Edit2, Save, X, Key, BarChart2, Shield, Menu, Bell,
-  ChevronDown, ChevronUp, Upload
+  ChevronDown, ChevronUp, Upload, Send, MessageSquare
 } from 'lucide-react';
 
 // ============================================================================
@@ -52,6 +52,13 @@ interface UploadedFile {
   logId: string; recordId: string; fileName: string; fileUrl: string; fileId: string;
   subfolder: string; uploadedByRole: string; uploadedBy: string; uploadDate: string;
   acknowledged: boolean; acknowledgedBy?: string; acknowledgedDate?: string; notes?: string;
+}
+
+// v14: Phase 3 messaging — a per-request thread between the URS and the
+// client, with the ISRM Officer also able to view and post into it.
+interface RequestMessage {
+  messageId: string; recordId: string; senderRole: 'client' | 'urs' | 'officer';
+  senderName: string; text: string; sentDate: string;
 }
 // ============================================================================
 // SESSION TOKEN
@@ -476,6 +483,89 @@ function URSFileUploadSection({ recordId, ursName }: { recordId: string; ursName
   );
 }
 
+function URSMessagesSection({ recordId, ursName }: { recordId: string; ursName: string }) {
+  const [messages, setMessages] = useState<RequestMessage[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const loadMessages = async () => {
+    setLoadingMessages(true);
+    try {
+      const res = await apiGet<{ success: boolean; messages?: RequestMessage[] }>('getRequestMessages', { recordId });
+      if (res.success) setMessages(res.messages || []);
+    } catch {
+      // Messages are a convenience; a failed fetch here shouldn't block the rest of the card.
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  useEffect(() => { loadMessages(); }, [recordId]);
+
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      const res = await apiPost<{ success: boolean; message?: string }>({
+        action: 'sendURSMessage', recordId, ursName, messageText: text,
+      });
+      if (res.success) {
+        setDraft('');
+        await loadMessages();
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const roleLabel = (role: string) => role === 'client' ? 'Client' : role === 'officer' ? 'ISRM Officer' : 'You';
+
+  return (
+    <div className="pt-2 mt-2 border-t border-slate-100">
+      <span className="text-xs font-bold text-slate-400 uppercase">Messages</span>
+
+      {loadingMessages && <p className="text-sm text-slate-400 mt-1.5">Loading messages…</p>}
+
+      {!loadingMessages && messages.length === 0 && (
+        <p className="text-sm text-slate-400 mt-1.5">No messages yet. Send a note to the client below.</p>
+      )}
+
+      {messages.length > 0 && (
+        <div className="space-y-2 mt-1.5 mb-2 max-h-64 overflow-y-auto">
+          {messages.map(m => (
+            <div key={m.messageId} className={m.senderRole === 'urs' ? 'text-right' : ''}>
+              <div className="text-xs font-semibold text-slate-500">{roleLabel(m.senderRole)}</div>
+              <div className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-line ${
+                m.senderRole === 'urs' ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-700'
+              }`}>
+                {m.text}
+              </div>
+              <div className="text-[11px] text-slate-400">{new Date(m.sentDate).toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-end gap-2 mt-1.5">
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          placeholder="Message the client…"
+          rows={2}
+          maxLength={2000}
+          className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-teal-600 resize-none"
+        />
+        <button onClick={handleSend} disabled={!draft.trim() || sending}
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <Send size={13} /> {sending ? 'Sending...' : 'Send'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // MY CLIENTS SECTION
 // ============================================================================
@@ -647,6 +737,7 @@ function MyClientsSection({ ursName, clients, onRefresh, showToast }:
                       </a>
                     )}
                     <URSFileUploadSection recordId={c['Record ID']} ursName={ursName} />
+                    <URSMessagesSection recordId={c['Record ID']} ursName={ursName} />
                   </div>
                 )}
               </Card>
